@@ -76,8 +76,10 @@ class TCPProxyProtocol(protocol.Protocol):
         proxy_to_server_factory.protocol = ProxyToServerProtocol
         proxy_to_server_factory.server = self
 
-        reactor.connectTCP(public.TRUSTED_SERVER_IP, public.TRUSTED_SERVER_PORT,
-                           proxy_to_server_factory)
+        #reactor.connectTCP(public.TRUSTED_SERVER_IP, public.TRUSTED_SERVER_PORT, proxy_to_server_factory)
+
+        #mitm
+        reactor.connectTCP(public.MITM_IP, public.MITM_AS_S_SERVER_PORT, proxy_to_server_factory)
 
     def dataReceived(self, data):
         """
@@ -146,8 +148,8 @@ def _noop(data):
 
 FORMAT_FN = _noop
 
-factory = protocol.ServerFactory()
-factory.protocol = TCPProxyProtocol
+factory1 = protocol.ServerFactory()
+factory1.protocol = TCPProxyProtocol
 print('Starting client B [*]: id = ', public.B_identifier)
 print('Starting client B [*]: ip = ', public.B_CLIENT_IP)
 print('Starting client B [*]: port = ', public.B_CLIENT_PORT)
@@ -156,5 +158,5 @@ print('Connection public parameters [*]: q = ', public.q)
 print('Connection public parameters [*]: g = ', public.g)
 print('Connection public parameters [*]: M = ', public.M)
 print('Connection public parameters [*]: N = ', public.N, '\n')
-reactor.listenTCP(public.B_CLIENT_PORT, factory)
+reactor.listenTCP(public.B_CLIENT_PORT, factory1)
 reactor.run()

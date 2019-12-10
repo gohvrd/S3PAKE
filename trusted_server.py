@@ -29,7 +29,7 @@ class S3PAKE(protocol.Protocol):
         print("     Session #", session_num, ":")
 
         seed()
-        z = randint(1, 3)  # public.q - 1
+        z = randint(1, public.q - 1)
         print("S parameters [*]: z = ", z, "\n")
 
         A, X, B, Y = unpack('hxqhxq', data)

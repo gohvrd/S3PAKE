@@ -65,8 +65,6 @@ class EchoClient(protocol.Protocol):
             print("Error [!]: Wrong alpha.")
             self.transport.loseConnection()
 
-            self.transport.loseConnection()
-
 
     def connectionLost(self, reason):
         pass
@@ -95,7 +93,10 @@ def main():
     print('Connection public parameters [*]: M = ', public.M)
     print('Connection public parameters [*]: N = ', public.N, '\n')
     f = EchoFactory()
-    reactor.connectTCP(public.B_CLIENT_IP, public.B_CLIENT_PORT, f)
+    #reactor.connectTCP(public.B_CLIENT_IP, public.B_CLIENT_PORT, f)
+
+    #mitm
+    reactor.connectTCP(public.MITM_IP, public.MITM_AS_B_CLIENT_PORT, f)
     reactor.run()
 
 

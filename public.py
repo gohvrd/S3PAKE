@@ -12,7 +12,7 @@ def G(values: tuple):
 A_identifier = 111
 B_identifier = 222
 S_identifier = 333
-C_identifier = 444
+MITM_identifier = 444
 
 TRUSTED_SERVER_IP = '127.0.0.1'
 TRUSTED_SERVER_PORT = 1997
@@ -22,5 +22,7 @@ B_CLIENT_PORT = 3456
 
 A_CLIENT_IP = '127.0.0.1'
 
-C_CLIENT_IP = '127.0.0.1'
-C_CLIENT_PORT = 4567
+#MITM
+MITM_IP = '127.0.0.1'
+MITM_AS_B_CLIENT_PORT = 5678
+MITM_AS_S_SERVER_PORT = 6789
