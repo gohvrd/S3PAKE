@@ -55,7 +55,7 @@ class EchoClient(protocol.Protocol):
         beta = responseMessageHandler(data)
         print('A calculates [*]: beta = ', beta)
 
-        if not beta is None:
+        if beta is not None:
             message = pack('q', beta)
             self.transport.write(message)
             print("A calculates [$COMPLETE$]: session key = ", SK)
