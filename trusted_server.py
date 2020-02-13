@@ -30,6 +30,7 @@ class S3PAKE(protocol.Protocol):
 
         seed()
         z = randint(1, public.q - 1)
+        print('S action [*]: received A||X||B||Y from B')
         print("S parameters [*]: z = ", z, "\n")
 
         A, X, B, Y = unpack('hxqhxq', data)
@@ -53,6 +54,7 @@ class S3PAKE(protocol.Protocol):
         print('S calculates [*]: S_X = ', S_X)
         S_Y = int((g_power_y ** z) * (public.G((A, public.S_identifier, g_power_x)) ** pwA))
         print('S calculates [*]: S_Y = ', S_Y)
+        print('S action [*]: sending S_X||S_Y')
 
         print("\n")
 

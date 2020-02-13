@@ -15,8 +15,10 @@ def connectionInitializationMessage():
 
     seed()
     x = randint(1, public.q - 1)
+    print('A action [*]: choosing random number x from Zp')
     print('A paramteters [*]: x = ', x)
     X = public.g ** x * public.M ** pwA
+    print('A action [*]: calculating X')
     print('A paramteters [*]: X = ', X, '\n')
 
     return pack('hxq', public.A_identifier, X)
@@ -44,12 +46,10 @@ def responseMessageHandler(message):
     return None
 
 class EchoClient(protocol.Protocol):
-    """Once connected, send a message, then print the result."""
-
     def connectionMade(self):
         self.transport.write(connectionInitializationMessage())
-        #print('send connection init')
-
+        print('A action [*]: sending A||X to B')
+ 
     def dataReceived(self, data):
         #print('received response from B')
         beta = responseMessageHandler(data)

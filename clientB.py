@@ -13,10 +13,15 @@ def receiveConnectRequest(message):
     global y
 
     seed()
+    print('B action [*]: receiving A||X from A')
     y = randint(1, public.q - 1)
+    print('B action [*]: choosing random number y from Zp') 
     print('B paramteters [*]: y = ', y)
     Y = public.g ** y * public.N ** pwB
+    print('B action [*]: calculating Y') 
     print('B paramteters [*]: Y = ', Y, '\n')
+
+    print('B action [*]: sending A||X||B||Y to S'
 
     return message + pack('hxq', public.B_identifier, Y)
 
@@ -25,6 +30,7 @@ def receiveTrustedServerResponse(response):
     global g_power_xz
 
     S_X, S_Y = unpack('qxq', response)
+    print('B action [*]: receiving S_X||S_Y from S')
     print('S paramteters (received) [*]: S_X = ', S_X)
     print('S paramteters (received) [*]: S_Y = ', S_Y)
     g_power_xz = int(S_X / public.G((public.B_identifier, public.S_identifier, public.g ** y)) ** pwB)
@@ -32,13 +38,17 @@ def receiveTrustedServerResponse(response):
     alpha = int(public.G((public.A_identifier, public.B_identifier, g_power_xz ** y)))
     print('B calculates [*]: alpha = ', alpha)
 
+    print('B action [*]: sending S_Y||alpha to A')
+
     return pack('qxq', S_Y, alpha)
 
 def receiveBeta(beta):
     global SK
 
     recv_beta = unpack('q', beta)[0]
+    print('B action [*]: receiving beta from A'
     print('A paramteters (received) [*]: beta = ', recv_beta)
+    print('B action [*]: independently calculate the value and compare it with the value')
     if recv_beta == int(public.G((public.B_identifier, public.A_identifier, g_power_xz ** y))):
         SK = public.H((public.A_identifier, public.B_identifier, g_power_xz ** y))
         print("B calculates [$COMPLETE$]: session key = ", SK)
