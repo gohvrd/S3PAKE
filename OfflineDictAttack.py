@@ -16,12 +16,19 @@ def connectionInitializationMessage():
     x = randint(1, public.q - 1)
     y = randint(1, public.q - 1)
 
+    print('Attacker action [*]: choosing random number x and y from Zp')
+    
     print('Attacker paramteters [*]: x = ', x)
     print('Attacker paramteters [*]: y = ', y)
     X = public.M ** x
     Y = public.M ** y * public.N ** pwAttackerB
+
+    print('Attacker action [*]: calculating specific X and Y')
+
     print('Attacker paramteters [*]: X = ', X)
-    print('Attacker paramteters [*]: Y = ', Y, '\n')
+    print('Attacker paramteters [*]: Y = ', Y)
+
+    print('Attacker action [*]: sending A||X||B||Y to S\n')
 
     return pack('hxq', public.A_identifier, X) + pack('hxq', public.B_identifier, Y)
 
@@ -29,8 +36,11 @@ def receiveTrustedServerResponse(response):
     global y, pwAttackerB
 
     S_X, S_Y = unpack('qxq', response)
+    print('Attacker action [*]: receiving S_X||S_Y from S')
     print('S paramteters (received) [*]: S_X = ', S_X)
-    print('S paramteters (received) [*]: S_Y = ', S_Y)
+    print('S paramteters (received) [*]: S_Y = ', S_Y, '\n')
+
+    print('Attacker action [*]: start guessing the password\n')
 
     K = int((int(S_X / (public.G((public.B_identifier, public.S_identifier, public.M ** y)) ** pwAttackerB))) ** y)
     print('Attacker calculates [*]: K = ', K)
@@ -83,7 +93,6 @@ class AttackerFactory(protocol.ClientFactory):
         reactor.stop()
 
 
-# this connects the protocol to a server running on port 8000
 def main():
     attackerFactory = AttackerFactory()
 
@@ -100,6 +109,5 @@ def main():
     reactor.run()
 
 
-# this only runs if the module was *not* imported
 if __name__ == '__main__':
     main()

@@ -21,12 +21,12 @@ def receiveConnectRequest(message):
 
     seed()
     y = randint(1, public.q - 1)
-    print('B paramteters [*]: y = ', y)
+    print('Attacker paramteters [*]: y = ', y)
 
     random_X = randint(1, 100000)
     random_alpha = randint(1, 100000)
-    print('B paramteters [*]: random X\' = ', random_X)
-    print('B paramteters [*]: random alpha\' = ', random_alpha, '\n')
+    print('Attacker paramteters [*]: random X\' = ', random_X)
+    print('Attacker paramteters [*]: random alpha\' = ', random_alpha, '\n')
 
     A, X = unpack('hxq', message)
 
@@ -55,15 +55,6 @@ def passwordGuesseResult(response):
 
 
 class TCPProxyProtocol(protocol.Protocol):
-    """
-    TCPProxyProtocol listens for TCP connections from a
-    client (eg. a phone) and forwards them on to a
-    specified destination (eg. an app's API server) over
-    a second TCP connection, using a ProxyToServerProtocol.
-
-    It assumes that neither leg of this trip is encrypted.
-    """
-
     def __init__(self):
         self.buffer = None
         self.connectedToProxy = Event()
@@ -73,12 +64,6 @@ class TCPProxyProtocol(protocol.Protocol):
         self.betaReceive = False
 
     def connectionMade(self):
-        """
-        Called by twisted when a client connects to the
-        proxy. Makes an connection from the proxy to the
-        server to complete the chain.
-        """
-        #print("Connection made from CLIENT => PROXY")
         proxyToServerFactory = protocol.ClientFactory()
         proxyToServerFactory.protocol = ProxyToServerProtocol
         proxyToServerFactory.server = self
@@ -87,12 +72,6 @@ class TCPProxyProtocol(protocol.Protocol):
                            proxyToServerFactory)
 
     def dataReceived(self, data):
-        """
-        Called by twisted when the proxy receives data from
-        the client. Sends the data on to the server.
-
-        CLIENT ===> PROXY ===> DST
-        """
         global A, X
 
         messForA, A, X = receiveConnectRequest(data)
@@ -112,21 +91,7 @@ class TCPProxyProtocol(protocol.Protocol):
 
 
 class ProxyToServerProtocol(protocol.Protocol):
-    """
-    ProxyToServerProtocol connects to a server over TCP.
-    It sends the server data given to it by an
-    TCPProxyProtocol, and uses the TCPProxyProtocol to
-    send data that it receives back from the server on
-    to a client.
-    """
-
     def connectionMade(self):
-        """
-        Called by twisted when the proxy connects to the
-        server. Flushes any buffered data on the proxy to
-        server.
-        """
-        #print("Connection made from PROXY => SERVER")
         self.factory.server.proxyToServerProtocol = self
         self.factory.server.connectedToProxy.set()
         self.write(self.factory.server.buffer)
@@ -157,12 +122,6 @@ class ProxyToServerProtocol(protocol.Protocol):
         self.write(message)
 
     def dataReceived(self, data):
-        """
-        Called by twisted when the proxy receives data
-        from the server. Sends the data on to to the client.
-
-        DST ===> PROXY ===> CLIENT
-        """
         global g_pwA
 
         if not passwordGuesseResult(data):

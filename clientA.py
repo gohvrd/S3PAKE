@@ -95,10 +95,10 @@ def main():
     print('Connection public parameters [*]: M = ', public.M)
     print('Connection public parameters [*]: N = ', public.N, '\n')
     f = PAKEFactory()
-    #reactor.connectTCP(public.B_CLIENT_IP, public.B_CLIENT_PORT, f)
+    reactor.connectTCP(public.B_CLIENT_IP, public.B_CLIENT_PORT, f)
 
     #mitm
-    reactor.connectTCP(public.MITM_IP, public.MITM_AS_B_CLIENT_PORT, f)
+    #reactor.connectTCP(public.MITM_IP, public.MITM_AS_B_CLIENT_PORT, f)
     reactor.run()
 
 
