@@ -58,10 +58,11 @@ class PAKEClient(protocol.Protocol):
  
     def dataReceived(self, data):
         beta = responseMessageHandler(data)
-        print('\nA calculates [*]: beta = ', beta)
-        print('A action [*]: sending beta to B\n')
 
         if beta is not None:
+            print('\nA calculates [*]: beta = ', beta)
+            print('A action [*]: sending beta to B\n')
+
             message = pack('q', beta)
             self.transport.write(message)
             print("A calculates [$COMPLETE$]: session key = ", SK)
@@ -70,7 +71,6 @@ class PAKEClient(protocol.Protocol):
         else:
             print("Error [!]: Wrong alpha.")
             self.transport.loseConnection()
-
 
     def connectionLost(self, reason):
         pass
