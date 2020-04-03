@@ -2,16 +2,20 @@ from twisted.internet import reactor, protocol
 
 from random import seed, randint
 from struct import pack, unpack
+from optparse import OptionParser
 import xml.etree.ElementTree as xml
+import xml.etree as etree
 import public
 
 settings = {
-    "pw": None,
-    "id": None,
-    "q": None,
-    "g": None,
-    "M": None,
-    "N": None,
+    'ip': None,
+    'port': None,
+    'pw': None,
+    'id': None,
+    'q': None,
+    'g': None,
+    'M': None,
+    'N': None,
 }
 
 SK = None
@@ -99,72 +103,160 @@ class ClientSettingsManager():
     def __init__(self):
         self.filename = 'client_settings.xml'
 
-    def setSettings(self, inSettings: dict):
-        global settings
+    def checkOptionName(self, optionName, inNames: list):
+        
+        for name in inNames:
+            if optionName == name:
+                return True
 
-        if type(inSettings) is not 'dict':
-            print("Передавать настройки можно только в словаре")
-            return
-
-        for key in settings.keys():
-            newVal = inSettings.get(key)
-            
-            if newVal is not None:
-                settings[key] = newVal
+        return False
 
     def createSettingsFile(self):
         root = xml.Element('settings')
 
+        network = xml.Element('network')
         private = xml.Element('private')
         public = xml.Element('public')
 
+        root.append(network)
         root.append(private)
         root.append(public)
 
-        pw = xml.SubElement(private, 'pw')
-        pw.text = 'test'
+        xml.SubElement(network, 'ip')
+        xml.SubElement(network, 'port')
+
+        xml.SubElement(private, 'pw')        
+
         xml.SubElement(public, 'id')
         xml.SubElement(public, 'q')
         xml.SubElement(public, 'g')
         xml.SubElement(public, 'M')
 
         tree = xml.ElementTree(root)
-        tree.write(self.filename)        
+        tree.write(self.filename)   
 
+    def setSettings(self, inSettings: dict):
+        global settings
 
-    def getClientSettings(self):
+        if type(inSettings) is not dict:
+            print("Передавать настройки можно только в словаре, передан: %s" % type(inSettings))
+            return
+
+        try:
+            tree = xml.ElementTree(file=self.filename)
+        except IOError:
+            self.createSettingsFile()
+            tree = xml.ElementTree(file=self.filename)
+
+        root = tree.getroot()
+
+        for settingsType in root:
+            for option in settingsType:
+                if self.checkOptionName(option.tag, inSettings.keys()):
+                    option.text = str(inSettings.get(option.tag))
+
+        tree = xml.ElementTree(root)
+        tree.write(self.filename)
+    
+    def getSettings(self):
         global settings
 
         try:
-            self.clSettings = xml.ElementTree(file=self.filename)
+            clSettings = xml.ElementTree(file=self.filename)
         except IOError:
             self.createSettingsFile()
-            self.clSettings = xml.ElementTree(file=self.filename)
+            clSettings = xml.ElementTree(file=self.filename)
 
-        settingsXML = self.clSettings.getroot()
+        settingsXML = clSettings.getroot()
 
         for settingsType in settingsXML:
             for parametr in settingsType:
                 settings[parametr.tag] = parametr.text
 
+    def checkSettingsFile(self):
+        try:
+            tree = xml.ElementTree(file=self.filename)
+        except IOError:
+            print("Создайте файл перед проверкой корректности его формата")
+            return
+        
+        root = tree.getroot()
+
+        trueTypeNames = ['network', 'private', 'public']
+        trueOptionNames = [
+            ['ip', 'port'], 
+            ['pw'], 
+            ['id', 'q', 'g', 'M']]
+
+        settingsType = enumerate(root)
+        
+        for i, typeName in settingsType:
+            if typeName.tag != trueTypeNames[i]:
+                return False
+
+            for j, optionName in enumerate(typeName):
+                if optionName.tag != trueOptionNames[i][j]:
+                    return False
+
+        return True
+
+def addSettings(options):
+    settingsDict = {}
+
+    if options['ip'] is not None:
+        settingsDict['ip'] = options['ip']
+
+    if options['port'] is not None:
+        settingsDict['port'] = options['port']
+
+    if options['pw'] is not None:
+        settingsDict['pw'] = options['pw']
+
+    if options['q'] is not None:
+        settingsDict['q'] = options['q']
+
+    if options['g'] is not None:
+        settingsDict['g'] = options['g']
+
+    if options['M'] is not None:
+        settingsDict['M'] = options['M']
+
+    return settingsDict
 
 def main():
     global settings
 
-    print('Starting client A [*]: id = ', public.A_identifier)
-    print('Starting client A [*]: ip = ', public.A_CLIENT_IP)
-    print('Starting client A [*]: connecting')
-    print('Connection public parameters [*]: q = ', public.q)
-    print('Connection public parameters [*]: g = ', public.g)
-    print('Connection public parameters [*]: M = ', public.M)
-    print('Connection public parameters [*]: N = ', public.N, '\n')
-    csm = ClientSettingsManager()
-    print(settings)
-    csm.getClientSettings()
-    print(settings)
-    csm.setSettings([1, 2])
-    print(settings)
+    optionParser = OptionParser()
     
+    optionParser.add_option('-a', '--ip', action='store')
+    optionParser.add_option('-p', '--port', action='store')
+    optionParser.add_option('-w', '--pw', action='store')
+    optionParser.add_option('-q', '--q', action='store')
+    optionParser.add_option('-g', '--g', action='store')
+    optionParser.add_option('-M', '--M', action='store')
+
+    (options, arguments) = optionParser.parse_args()
+
+    csm = ClientSettingsManager()
+
+    if not csm.checkSettingsFile():
+        print("Поврежден файл с настройками клиента")
+        return
+
+    settingsDict = addSettings(options.__dict__)
+    
+    if settingsDict != {}:
+        csm.setSettings(settingsDict)                
+
+    csm.getSettings()
+
+    print('Starting client A [*]: id = ', settings['id'])
+    print('Starting client A [*]: ip = ', settings['ip'])
+    print('Starting client A [*]: connecting')
+    print('Connection public parameters [*]: q = ', settings['q'])
+    print('Connection public parameters [*]: g = ', settings['g'])
+    print('Connection public parameters [*]: M = ', settings['M'], '\n')
+        
     #f = PAKEFactory()
     #reactor.connectTCP(public.B_CLIENT_IP, public.B_CLIENT_PORT, f)
 
