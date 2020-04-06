@@ -21,59 +21,25 @@ settings = {
     'uid': None
 }
 
-SK = None
+def H(values: tuple):
+    return (values[0] + values[1] / 2 + values[2]) % 100 + 1
 
-g_power_yz = None
-x = None
+def G(values: tuple):
+    return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
 
-def connectionInitializationMessage():
-    global x
 
-    seed()
-    x = randint(1, public.q - 1)
-    print('A action [*]: choosing random number x from Zp')
-    print('A paramteters [*]: x = ', x)
-    X = settings['g'] ** x * settings['M'] ** settings['pw']
-    print('A action [*]: calculating X')
-    print('A paramteters [*]: X = ', X)
+class ClientInitiator(protocol.Protocol):
+    def __init__(self):
+        self.SK = None
+        self.g_power_yz = None
+        self.x = None
 
-    return pack('hxq', settings['id'], X)
-
-def betaMessage():
-    return int(public.G((settings['uid'], settings['id'], g_power_yz ** x)))
-
-def responseMessageHandler(message):
-    global x
-    global g_power_yz
-    global SK
-
-    S_Y, alpha = unpack('qxq', message)
-    print('A action [*]: receiving S_Y||alpha from B')
-    print('S paramteters (received) [*]: S_Y = ', S_Y)
-    print('B paramteters (received) [*]: alpha = ', alpha, '\n')
-    g_power_yz = int(S_Y / (public.G((settings['id'], settings['sid'], settings['g'] ** x)) ** settings['pw']))
-    print('A calculates [*]: g^(yz) = ', g_power_yz)
-
-    test_alpha = int(public.G((settings['id'], settings['uid'], g_power_yz ** x)))
-    
-    print('A action [*]: independently calculate the alpha\' and compare it with the alpha')
-
-    if alpha == test_alpha:
-        print('A action [*]: alpha\' = alpha')
-        SK = public.H((settings['id'], settings['uid'], g_power_yz ** x))
-        return betaMessage()
-
-    print('A action [*]: alpha\' != alpha')
-
-    return None
-
-class PAKEClient(protocol.Protocol):
     def connectionMade(self):
-        self.transport.write(connectionInitializationMessage())
+        self.transport.write(self.connectionInitializationMessage())
         print('A action [*]: sending A||X to B\n')
  
     def dataReceived(self, data):
-        beta = responseMessageHandler(data)
+        beta = self.responseMessageHandler(data)
 
         if beta is not None:
             print('\nA calculates [*]: beta = ', beta)
@@ -81,7 +47,7 @@ class PAKEClient(protocol.Protocol):
 
             message = pack('q', beta)
             self.transport.write(message)
-            print("A calculates [$COMPLETE$]: session key = ", SK)
+            print("A calculates [$COMPLETE$]: session key = ", self.SK)
 
             self.transport.loseConnection()
         else:
@@ -91,15 +57,152 @@ class PAKEClient(protocol.Protocol):
     def connectionLost(self, reason):
         pass
 
+    def connectionInitializationMessage(self):
+        seed()
+        self.x = randint(1, settings['q'] - 1)
+        print('A action [*]: choosing random number x from Zp')
+        print('A paramteters [*]: x = ', self.x)
+        X = settings['g'] ** self.x * settings['M'] ** settings['pw']
+        print('A action [*]: calculating X')
+        print('A paramteters [*]: X = ', X)
 
-class PAKEFactory(protocol.ClientFactory):
-    protocol = PAKEClient
+        return pack('hxq', settings['id'], X)
+
+    def betaMessage(self):
+        return int(G((settings['uid'], settings['id'], self.g_power_yz ** self.x)))
+
+    def responseMessageHandler(self, message):
+        S_Y, alpha = unpack('qxq', message)
+        print('A action [*]: receiving S_Y||alpha from B')
+        print('S paramteters (received) [*]: S_Y = ', S_Y)
+        print('B paramteters (received) [*]: alpha = ', alpha, '\n')
+        self.g_power_yz = int(S_Y / (G((settings['id'], settings['sid'], settings['g'] ** self.x)) ** settings['pw']))
+        print('A calculates [*]: g^(yz) = ', self.g_power_yz)
+
+        test_alpha = int(G((settings['id'], settings['uid'], self.g_power_yz ** self.x)))
+        
+        print('A action [*]: independently calculate the alpha\' and compare it with the alpha')
+
+        if alpha == test_alpha:
+            print('A action [*]: alpha\' = alpha')
+            self.SK = H((settings['id'], settings['uid'], self.g_power_yz ** self.x))
+            return self.betaMessage()
+
+        print('A action [*]: alpha\' != alpha')
+
+        return None
+
+
+class ClientInitiatorFactory(protocol.ClientFactory):
+    protocol = ClientInitiator
 
     def clientConnectionFailed(self, connector, reason):
         reactor.stop()
 
     def clientConnectionLost(self, connector, reason):
         reactor.stop()
+
+
+class ClientListner(protocol.Protocol):
+    def __init__(self):
+        seed()
+        self.y = randint(1, settings['q'] - 1)
+        self.SK = None
+        self.initId = None
+
+        self.buffer = None
+        self.proxy_to_server_protocol = None
+
+        self.initialReceive = False
+        self.betaReceive = False
+
+    def connectionMade(self):
+        proxy_to_server_factory = protocol.ClientFactory()
+        proxy_to_server_factory.protocol = ClientProxy
+        proxy_to_server_factory.server = self
+
+        reactor.connectTCP(settings['sip'], settings['sport'], proxy_to_server_factory)
+
+        #mitm
+        #reactor.connectTCP(public.MITM_IP, public.MITM_AS_S_SERVER_PORT, proxy_to_server_factory)
+
+    def dataReceived(self, data):
+        if not self.initialReceive:
+            mess = self.receiveConnectRequest(data)
+            if self.proxy_to_server_protocol:
+                self.proxy_to_server_protocol.write(mess)
+            else:
+                self.buffer = mess
+            self.initialReceive = True
+        elif not self.betaReceive:
+            self.receiveBeta(data)
+            self.betaReceive = True
+
+    def write(self, data):
+        self.transport.write(data)
+
+    def receiveConnectRequest(self, message):        
+        print('B action [*]: receiving A||X from A\n')
+        self.initId, X = unpack('hxq', message)
+        print('B action [*]: choosing random number y from Zp') 
+        print('B paramteters [*]: y = ', self.y)
+        Y = settings['g'] ** self.y * settings['N'] ** settings['pw']
+        print('B action [*]: calculating Y') 
+        print('B paramteters [*]: Y = ', Y)
+
+        print('B action [*]: sending A||X||B||Y to S\n')
+
+        return message + pack('hxq', settings['id'], Y)
+
+    def receiveBeta(self, beta):
+        recv_beta = unpack('q', beta)[0]
+        print('B action [*]: receiving beta from A')
+        print('A paramteters (received) [*]: beta = ', recv_beta)
+        print('B action [*]: independently calculate the beta\' and compare it with the beta')
+        if recv_beta == int(G((settings['id'], self.initId, self.proxy_to_server_protocol.g_power_xz ** self.y))):
+            print('B action [*]: beta\' = beta\n')
+            self.SK = H((self.initId, settings['id'], self.proxy_to_server_protocol.g_power_xz ** self.y))
+            print("B calculates [$COMPLETE$]: session key = ", self.SK)
+        else:
+            print('B action [*]: beta\' != beta')
+            print("Error [!]: Wrong beta.")
+
+        reactor.stop()
+
+
+class ClientProxy(protocol.Protocol):
+    def __init__(self):
+        self.g_power_xz = None
+
+    def connectionMade(self):
+        self.factory.server.proxy_to_server_protocol = self
+        self.write(self.factory.server.buffer)
+        self.factory.server.buffer = ''
+
+        self.serverResponseReceive = False
+
+    def dataReceived(self, data):
+        if not self.serverResponseReceive:
+            self.factory.server.write(self.receiveTrustedServerResponse(data))
+            self.serverResponseReceive = True
+
+    def write(self, data):
+        if data:
+            self.transport.write(data)
+
+    def receiveTrustedServerResponse(self, response):
+        S_X, S_Y = unpack('qxq', response)
+        print('B action [*]: receiving S_X||S_Y from S')
+        print('S paramteters (received) [*]: S_X = ', S_X)
+        print('S paramteters (received) [*]: S_Y = ', S_Y, '\n')
+        self.g_power_xz = int(S_X / G((settings['id'], settings['sid'], settings['g'] ** self.factory.server.y)) ** settings['pw'])
+        print('B calculates [*]: g^(xz) = ', self.g_power_xz)
+        alpha = int(G((self.factory.server.initId, settings['id'], self.g_power_xz ** self.factory.server.y)))
+        print('B calculates [*]: alpha = ', alpha)
+
+        print('B action [*]: sending S_Y||alpha to A\n')
+
+        return pack('qxq', S_Y, alpha)
 
 
 class ClientSettingsManager():
@@ -212,7 +315,7 @@ class ClientSettingsManager():
         trueOptionNames = [
             ['port'], 
             ['pw'], 
-            ['id', 'q', 'g', 'M'],
+            ['id', 'q', 'g', 'M', 'N'],
             ['sid', 'sip', 'sport'],
             ['uid']]
 
@@ -229,44 +332,55 @@ class ClientSettingsManager():
         return True
 
     def generalCheckSettings(self, settings):
-        if settings['q'] is None:
-            return False
-        elif settings['g'] is None:
-            return False
-        elif settings['id'] is None:
-            return False
-        elif settings['sid'] is None:
-            return False
-        elif settings['pw'] is None:
-            return False
+        result = True
 
-        return True
+        if settings['q'] is None:
+            print("Необходимо указать q")
+            result = False
+        if settings['g'] is None:
+            print("Необходимо указать g")
+            result = False
+        if settings['id'] is None:
+            print("Необходимо указать id")
+            result = False
+        if settings['sid'] is None:
+            print("Необходимо указать sid")
+            result = False
+        if settings['pw'] is None:
+            print("Необходимо указать pw")
+            result = False
+
+        return result
 
     def initiatorCheckSettings(self, settings):
-        if self.generalCheckSettings(settings):
-            if settings['M'] is None:
-                return False
-            elif settings['uid'] is None:
-                return False
-            
-            return True
+        result = self.generalCheckSettings(settings)
+
+        if settings['M'] is None:
+            print("Необходимо указать M")
+            result = False
+        elif settings['uid'] is None:
+            print("Необходимо указать uid")
+            result = False
         
-        return False
+        return result
 
     def listnerCheckSettings(self, settings):
-        if self.generalCheckSettings(settings):
-            if settings['N'] is None:
-                return False
-            elif settings['port'] is None:
-                return False
-            elif settings['sip'] is None:
-                return False
-            elif settings['sport'] is None:
-                return False
+        result = self.generalCheckSettings(settings)
+        
+        if settings['N'] is None:
+            print("Необходимо указать N")
+            result = False
+        elif settings['port'] is None:
+            print("Необходимо указать port")
+            result = False
+        elif settings['sip'] is None:
+            print("Необходимо указать sip")
+            result = False
+        elif settings['sport'] is None:
+            print("Необходимо указать sport")
+            result = False
 
-            return True
-
-        return False
+        return result
 
     def addSettings(self, options):
         settingsDict = {}
@@ -372,17 +486,19 @@ def main():
     print('Connection public parameters [*]: M = ', settings['M'], '\n')
 
     if options.__dict__['connect'] is not None:
+        print("Подключение")
         if options.__dict__['listen']:
             print('Одновременно можно выбрать только один режим работы')
             return
 
         if not csm.initiatorCheckSettings(settings):
+            print("Не правильно сконфигурирован инициатор")
             return
 
         ip, port = connectionAddressParser(options.__dict__['connect'])
 
         if ip is not None and port is not None:
-            f = PAKEFactory()
+            f = ClientInitiatorFactory()
             reactor.connectTCP(ip, port, f)
             print('Starting client A [*]: connecting')
         else:
@@ -390,16 +506,18 @@ def main():
             return
     elif options.__dict__['listen']:
         if not csm.listnerCheckSettings(settings):
+            print("Не правильно сконфигурирован принимающий клиент")
             return
 
         port = settings['port']
 
         factory = protocol.ServerFactory()
-        factory.protocol = PAKEProxyProtocol
+        factory.protocol = ClientListner
         reactor.listenTCP(port, factory)        
 
     #mitm
     #reactor.connectTCP(public.MITM_IP, public.MITM_AS_B_CLIENT_PORT, f)
+    print("Успех")
     reactor.run()
 
 

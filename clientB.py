@@ -73,10 +73,10 @@ class PAKEProxyProtocol(protocol.Protocol):
         proxy_to_server_factory.protocol = ProxyToTrustedServerProtocol
         proxy_to_server_factory.server = self
 
-        #reactor.connectTCP(public.TRUSTED_SERVER_IP, public.TRUSTED_SERVER_PORT, proxy_to_server_factory)
+        reactor.connectTCP(public.TRUSTED_SERVER_IP, public.TRUSTED_SERVER_PORT, proxy_to_server_factory)
 
         #mitm
-        reactor.connectTCP(public.MITM_IP, public.MITM_AS_S_SERVER_PORT, proxy_to_server_factory)
+        #reactor.connectTCP(public.MITM_IP, public.MITM_AS_S_SERVER_PORT, proxy_to_server_factory)
 
     def dataReceived(self, data):
         if not self.initialReceive:

@@ -3,11 +3,7 @@ g = 2   #parent element
 M = 4
 N = 8
 
-def H(values: tuple):
-    return (values[0] + values[1] / 2 + values[2]) % 100 + 1
 
-def G(values: tuple):
-    return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
 
 A_identifier = 111
 B_identifier = 222
