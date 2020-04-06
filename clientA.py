@@ -30,6 +30,9 @@ def G(values: tuple):
 
 class ClientInitiator(protocol.Protocol):
     def __init__(self):
+        global settings
+        
+        self.settings = settings
         self.SK = None
         self.g_power_yz = None
         self.x = None
@@ -59,33 +62,33 @@ class ClientInitiator(protocol.Protocol):
 
     def connectionInitializationMessage(self):
         seed()
-        self.x = randint(1, settings['q'] - 1)
+        self.x = randint(1, self.settings['q'] - 1)
         print('A action [*]: choosing random number x from Zp')
         print('A paramteters [*]: x = ', self.x)
-        X = settings['g'] ** self.x * settings['M'] ** settings['pw']
+        X = self.settings['g'] ** self.x * self.settings['M'] ** self.settings['pw']
         print('A action [*]: calculating X')
         print('A paramteters [*]: X = ', X)
 
-        return pack('hxq', settings['id'], X)
+        return pack('hxq', self.settings['id'], X)
 
     def betaMessage(self):
-        return int(G((settings['uid'], settings['id'], self.g_power_yz ** self.x)))
+        return int(G((self.settings['uid'], self.settings['id'], self.g_power_yz ** self.x)))
 
     def responseMessageHandler(self, message):
         S_Y, alpha = unpack('qxq', message)
         print('A action [*]: receiving S_Y||alpha from B')
         print('S paramteters (received) [*]: S_Y = ', S_Y)
         print('B paramteters (received) [*]: alpha = ', alpha, '\n')
-        self.g_power_yz = int(S_Y / (G((settings['id'], settings['sid'], settings['g'] ** self.x)) ** settings['pw']))
+        self.g_power_yz = int(S_Y / (G((self.settings['id'], self.settings['sid'], self.settings['g'] ** self.x)) ** self.settings['pw']))
         print('A calculates [*]: g^(yz) = ', self.g_power_yz)
 
-        test_alpha = int(G((settings['id'], settings['uid'], self.g_power_yz ** self.x)))
+        test_alpha = int(G((self.settings['id'], self.settings['uid'], self.g_power_yz ** self.x)))
         
         print('A action [*]: independently calculate the alpha\' and compare it with the alpha')
 
         if alpha == test_alpha:
             print('A action [*]: alpha\' = alpha')
-            self.SK = H((settings['id'], settings['uid'], self.g_power_yz ** self.x))
+            self.SK = H((self.settings['id'], self.settings['uid'], self.g_power_yz ** self.x))
             return self.betaMessage()
 
         print('A action [*]: alpha\' != alpha')
@@ -105,8 +108,11 @@ class ClientInitiatorFactory(protocol.ClientFactory):
 
 class ClientListner(protocol.Protocol):
     def __init__(self):
+        global settings
+
+        self.settings = settings
         seed()
-        self.y = randint(1, settings['q'] - 1)
+        self.y = randint(1, self.settings['q'] - 1)
         self.SK = None
         self.initId = None
 
@@ -121,7 +127,7 @@ class ClientListner(protocol.Protocol):
         proxy_to_server_factory.protocol = ClientProxy
         proxy_to_server_factory.server = self
 
-        reactor.connectTCP(settings['sip'], settings['sport'], proxy_to_server_factory)
+        reactor.connectTCP(self.settings['sip'], self.settings['sport'], proxy_to_server_factory)
 
         #mitm
         #reactor.connectTCP(public.MITM_IP, public.MITM_AS_S_SERVER_PORT, proxy_to_server_factory)
@@ -146,22 +152,22 @@ class ClientListner(protocol.Protocol):
         self.initId, X = unpack('hxq', message)
         print('B action [*]: choosing random number y from Zp') 
         print('B paramteters [*]: y = ', self.y)
-        Y = settings['g'] ** self.y * settings['N'] ** settings['pw']
+        Y = self.settings['g'] ** self.y * self.settings['N'] ** self.settings['pw']
         print('B action [*]: calculating Y') 
         print('B paramteters [*]: Y = ', Y)
 
         print('B action [*]: sending A||X||B||Y to S\n')
 
-        return message + pack('hxq', settings['id'], Y)
+        return message + pack('hxq', self.settings['id'], Y)
 
     def receiveBeta(self, beta):
         recv_beta = unpack('q', beta)[0]
         print('B action [*]: receiving beta from A')
         print('A paramteters (received) [*]: beta = ', recv_beta)
         print('B action [*]: independently calculate the beta\' and compare it with the beta')
-        if recv_beta == int(G((settings['id'], self.initId, self.proxy_to_server_protocol.g_power_xz ** self.y))):
+        if recv_beta == int(G((self.settings['id'], self.initId, self.proxy_to_server_protocol.g_power_xz ** self.y))):
             print('B action [*]: beta\' = beta\n')
-            self.SK = H((self.initId, settings['id'], self.proxy_to_server_protocol.g_power_xz ** self.y))
+            self.SK = H((self.initId, self.settings['id'], self.proxy_to_server_protocol.g_power_xz ** self.y))
             print("B calculates [$COMPLETE$]: session key = ", self.SK)
         else:
             print('B action [*]: beta\' != beta')
@@ -172,6 +178,9 @@ class ClientListner(protocol.Protocol):
 
 class ClientProxy(protocol.Protocol):
     def __init__(self):
+        global settings
+
+        self.settings = settings
         self.g_power_xz = None
 
     def connectionMade(self):
@@ -195,9 +204,9 @@ class ClientProxy(protocol.Protocol):
         print('B action [*]: receiving S_X||S_Y from S')
         print('S paramteters (received) [*]: S_X = ', S_X)
         print('S paramteters (received) [*]: S_Y = ', S_Y, '\n')
-        self.g_power_xz = int(S_X / G((settings['id'], settings['sid'], settings['g'] ** self.factory.server.y)) ** settings['pw'])
+        self.g_power_xz = int(S_X / G((self.settings['id'], self.settings['sid'], self.settings['g'] ** self.factory.server.y)) ** self.settings['pw'])
         print('B calculates [*]: g^(xz) = ', self.g_power_xz)
-        alpha = int(G((self.factory.server.initId, settings['id'], self.g_power_xz ** self.factory.server.y)))
+        alpha = int(G((self.factory.server.initId, self.settings['id'], self.g_power_xz ** self.factory.server.y)))
         print('B calculates [*]: alpha = ', alpha)
 
         print('B action [*]: sending S_Y||alpha to A\n')
