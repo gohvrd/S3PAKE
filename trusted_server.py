@@ -2,6 +2,9 @@ from twisted.internet import reactor, protocol
 from struct import unpack, pack
 from random import seed, randint
 import sqlite3
+import optparse
+import xml.etree.ElementTree as xml
+import re
 
 settings = {
     'port': None,
@@ -21,7 +24,7 @@ class TrustedServer(protocol.Protocol):
 
         self.settings = settings
         self.sessionNum = 1
-        self.dbName = './s3pake.db'
+        self.dbm = DatabaseManager('./s3pake.db')
 
     def connectionMade(self):
         """
@@ -53,15 +56,13 @@ class TrustedServer(protocol.Protocol):
         print("B parameters (received) [*]: Y = ", Y)
 
 
-        pwA = self.GetClientSecretPassowrd(A)
-        pwB = self.GetClientSecretPassowrd(B)
+        pwA = self.dbm.getPwById(A)
+        pwB = self.dbm.getPwById(B)
 
         gPowerX = int(X / self.settings['M'] ** pwA)
         print('S calculates [*]: g^x = ', gPowerX)
         gPowerY = int(Y / self.settings['N'] ** pwB)
         print('S calculates [*]: g^y = ', gPowerY)
-
-
 
         S_X = int((gPowerX ** z) * (G((B, self.settings['id'], gPowerY)) ** pwB))
         print('S calculates [*]: S_X = ', S_X)
@@ -73,15 +74,78 @@ class TrustedServer(protocol.Protocol):
 
         self.sessionNum += 1
 
-        self.transport.write(pack("qxq", S_X, S_Y))
+        self.transport.write(pack("qxq", S_X, S_Y))        
 
-    def GetClientSecretPassowrd(self, id: int):
+
+class DatabaseManager():
+    def __init__(self, dbName):
+        self.dbName = dbName
+
+    def getPwById(self, id):
         connection = sqlite3.connect(self.dbName)
+
         cursor = connection.cursor()
         cursor.execute("SELECT SECRET_PASS FROM USERS_SECRETS WHERE USER_ID = {0:d}".format(id))
         result = cursor.fetchone()
+        
+        connection.close()
 
         return int(result[0])
+
+    def setPwById(self, id, pw):
+        connection = sqlite3.connect(self.dbName)
+
+        cursor = connection.cursor()
+        cursor.execute("UPDATE USERS_SECRETS SET SECRET_PASS = {0:d} WHERE USER_ID = {1:d}".format(pw, id))
+        print("Количество обновленных строк: {:d}".format(cursor.rowcount))
+
+        connection.commit()
+        
+        connection.close()
+
+    def checkUniqId(self, id):
+        connection = sqlite3.connect(self.dbName)
+
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM USERS_SECRETS WHERE USER_ID = {0:d}".format(id))
+        result = cursor.fetchone()
+
+        if result is None:
+            return True
+        
+        return False
+
+    def clientRegistration(self, id, pw):
+        if type(id) is not int and id <= 0:
+            print("Идентификатор должен быть положительным целым числом")
+            return
+
+        if not self.checkUniqId(id):
+            print("Выбранный идентификатор уже занят другим пользователем")
+            return
+
+        if type(pw) is not int and pw <= 0:
+            print("Пароль должен быть положительным целым числом")
+            return
+
+        connection = sqlite3.connect(self.dbName)
+
+        cursor = connection.cursor()
+        cursor.execute("INSERT INTO USERS_SECRETS VALUES ({0:d},{1:d})".format(id, pw))        
+
+        connection.commit()
+        
+        connection.close()
+
+    def deleteClient(self, id):
+        connection = sqlite3.connect(self.dbName)
+
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM USERS_SECRETS WHERE USER_ID = {:d}".format(id))        
+
+        connection.commit()
+        
+        connection.close()       
 
 
 class ServerSettingsManager():
@@ -240,8 +304,84 @@ class ServerSettingsManager():
         return settingsDict
 
 
+def dbOptions(new: str, dele: str, upd: str):
+    newExists = new is not None
+    delExists = dele is not None
+    updExists = upd is not None
+
+    if (newExists and updExists) or \
+        (delExists and updExists) or \
+        (delExists and newExists):
+        print("Выберите только одну опцию n/d/u")
+        return False
+
+    dbm = DatabaseManager('./s3pake.db')
+
+    if newExists:
+        regex = r"^([\d]+):([\d]+$)"
+        
+        result = re.search(regex, new)
+
+        if result is None:
+            print("Формат передачи данных нового пользователя: \'id:pw\'")
+            return False
+
+        id = int(result.group(1))
+        pw = int(result.group(2))
+
+        dbm.clientRegistration(id, pw)        
+    elif delExists:
+        dbm.deleteClient(int(dele))
+    elif updExists:
+        regex = r"^([\d]+):([\d]+$)"
+        
+        result = re.search(regex, new)
+
+        if result is None:
+            print("Формат передачи данных для обновления пароля пользователя: \'id:pw\'")
+            return False
+
+        id = int(result.group(1))
+        pw = int(result.group(2))
+
+        dbm.setPwById(id, pw)
+
+    return True
+
+
 def main():
     global settings
+
+    optionParser = optparse.OptionParser()
+    
+    optionParser.add_option('-i', '--id', action='store')
+    optionParser.add_option('-p', '--port', action='store')
+    optionParser.add_option('-q', '--q', action='store')
+    optionParser.add_option('-g', '--g', action='store')
+    optionParser.add_option('-M', '--M', action='store')
+    optionParser.add_option('-N', '--N', action='store')
+
+    optionParser.add_option('-n', '--new', action='store')
+    optionParser.add_option('-d', '--del', action='store')
+    optionParser.add_option('-u', '--upd', action='store')
+
+    (options, arguments) = optionParser.parse_args()
+
+    csm = ServerSettingsManager()
+
+    if not csm.checkSettingsFile():
+        print("Поврежден файл с настройками клиента")
+        return
+
+    settingsDict = csm.addSettings(options.__dict__)
+    
+    if settingsDict != {}:
+        csm.setSettings(settingsDict)                
+
+    csm.getSettings()
+
+    if not dbOptions(options['new'], options['del'], options['upd']):
+        return
 
     """This runs the protocol on port 1997"""
     factory = protocol.ServerFactory()

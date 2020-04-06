@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='us-ascii'?>
+<settings>
+    <network>
+        <port>1997</port>
+    </network>
+    <public>
+        <id>333</id>
+        <q>3</q>
+        <g>2</g>
+        <M>4</M>
+        <N>8</N>
+    </public>
+</settings>
