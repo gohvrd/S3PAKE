@@ -21,6 +21,14 @@
             "args": ["-c", "127.0.0.1:3456"]
         },
         {
+            "name": "dboptions",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["-d", "1"]
+        },
+        {
             "name": "Python: Текущий файл",
             "type": "python",
             "request": "launch",

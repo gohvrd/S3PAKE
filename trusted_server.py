@@ -26,51 +26,34 @@ class TrustedServer(protocol.Protocol):
         self.sessionNum = 1
         self.dbm = DatabaseManager('./s3pake.db')
 
-    def connectionMade(self):
-        """
-        Called by twisted when a client connects to the
-        proxy. Makes an connection from the proxy to the
-        server to complete the chain.
-        """
-        pass
-        #print("Connection made from B => TRUSTED")
-
     def dataReceived(self, data):
-        '''
-        Received connection data from client and send answer.
-
-        :param data: connection data from client(format: id(2) || A(2) || 00 || X(4) || B(2) || Y(4))
-        :return:
-        '''
-        print("     Session #", self.sessionNum, ":")
+        print("[*]: Сеанс №{0:d}".format(self.sessionNum))
 
         seed()
         z = randint(1, self.settings['q'] - 1)
-        print('S action [*]: received A||X||B||Y from B')
-        print("S parameters [*]: z = ", z, "\n")
-
         A, X, B, Y = unpack('hxqhxq', data)
-        print("A parameters (received) [*]: A = ", A)
-        print("A parameters (received) [*]: X = ", X)
-        print("B parameters (received) [*]: B = ", B)
-        print("B parameters (received) [*]: Y = ", Y)
 
+        print("Получено сообщение [*]: A||X||B||Y от пользователя с id = {0:d}".format(B))
+        print("[*]: \tA = {0:d}".format(A))
+        print("[*]: \tX = {0:d}".format(X))
+        print("[*]: \tB = {0:d}".format(B))
+        print("[*]: \tY = {0:d}\n".format(Y))
 
+        print("[*]: Выбирается случайное z = {0:d}".format(z))   
+        
         pwA = self.dbm.getPwById(A)
         pwB = self.dbm.getPwById(B)
 
         gPowerX = int(X / self.settings['M'] ** pwA)
-        print('S calculates [*]: g^x = ', gPowerX)
+        print("[*]: Вычисляется g^x = {0:d}".format(gPowerX))
         gPowerY = int(Y / self.settings['N'] ** pwB)
-        print('S calculates [*]: g^y = ', gPowerY)
+        print("[*]: Вычисляется g^y = {0:d}".format(gPowerY))
 
         S_X = int((gPowerX ** z) * (G((B, self.settings['id'], gPowerY)) ** pwB))
-        print('S calculates [*]: S_X = ', S_X)
+        print("[*]: Вычисляется S_X = {0:d}".format(S_X))
         S_Y = int((gPowerY ** z) * (G((A, self.settings['id'], gPowerX)) ** pwA))
-        print('S calculates [*]: S_Y = ', S_Y)
-        print('S action [*]: sending S_X||S_Y')
-
-        print("\n")
+        print("[*]: Вычисляется S_Y = {0:d}".format(S_Y))
+        print("Отправлено сообщение [*]: S_X||S_Y\n")
 
         self.sessionNum += 1
 
@@ -96,8 +79,15 @@ class DatabaseManager():
         connection = sqlite3.connect(self.dbName)
 
         cursor = connection.cursor()
-        cursor.execute("UPDATE USERS_SECRETS SET SECRET_PASS = {0:d} WHERE USER_ID = {1:d}".format(pw, id))
-        print("Количество обновленных строк: {:d}".format(cursor.rowcount))
+        try:
+            cursor.execute("UPDATE USERS_SECRETS SET SECRET_PASS = {0:d} WHERE USER_ID = {1:d}".format(pw, id))
+        except:
+            print("Ошибка [!]: Ошибка при изменении пароля пользователя (id = {0:d})".format(id))
+        
+        if cursor.rowcount == 0:
+            print("Ошибка [!]: Пользователя с id = {0:d} не существует".format(id))
+        else:
+            print("Количество обновленных строк: {0:d}".format(cursor.rowcount))
 
         connection.commit()
         
@@ -117,21 +107,26 @@ class DatabaseManager():
 
     def clientRegistration(self, id, pw):
         if type(id) is not int and id <= 0:
-            print("Идентификатор должен быть положительным целым числом")
+            print("Ошибка [!]: Идентификатор должен быть положительным целым числом")
             return
 
         if not self.checkUniqId(id):
-            print("Выбранный идентификатор уже занят другим пользователем")
+            print("Ошибка [!]: Выбранный идентификатор уже занят другим пользователем")
             return
 
         if type(pw) is not int and pw <= 0:
-            print("Пароль должен быть положительным целым числом")
+            print("Ошибка [!]: Пароль должен быть положительным целым числом")
             return
 
         connection = sqlite3.connect(self.dbName)
 
         cursor = connection.cursor()
-        cursor.execute("INSERT INTO USERS_SECRETS VALUES ({0:d},{1:d})".format(id, pw))        
+        try:
+            cursor.execute("INSERT INTO USERS_SECRETS VALUES ({0:d},{1:d})".format(id, pw))
+        except:
+            print("Ошибка [!]: Ошибка регистрации пользователя (id = {0:d})".format(id))
+
+        print("Пользователь успешно зарегистрирован (id = {0:d})".format(id))
 
         connection.commit()
         
@@ -141,7 +136,15 @@ class DatabaseManager():
         connection = sqlite3.connect(self.dbName)
 
         cursor = connection.cursor()
-        cursor.execute("DELETE FROM USERS_SECRETS WHERE USER_ID = {:d}".format(id))        
+        try:
+            cursor.execute("DELETE FROM USERS_SECRETS WHERE USER_ID = {0:d}".format(id))        
+        except:
+            print("Ошибка [!]: Ошибка удаления пользователя (id = {0:d})".format(id))
+
+        if cursor.rowcount == 0:
+            print("Ошибка [!]: Пользователя с id = {0:d} не существует".format(id))
+        else:
+            print("Пользователь успешно удален (id = {0:d})".format(id))
 
         connection.commit()
         
@@ -187,13 +190,13 @@ class ServerSettingsManager():
         try:
             tree.write(self.filename, xml_declaration=True)   
         except:
-            print('Ошибка создания файла настроек')
+            print('Ошибка [!]: Ошибка создания файла настроек')
 
     def setSettings(self, inSettings: dict):
         global settings
 
         if type(inSettings) is not dict:
-            print("Передавать настройки можно только в словаре, передан: %s" % type(inSettings))
+            print("Ошибка [!]: Передавать настройки можно только в словаре, передан: %s" % type(inSettings))
             return
 
         try:
@@ -213,7 +216,7 @@ class ServerSettingsManager():
         try:
             tree.write(self.filename)
         except:
-            print('Ошибка добавления новых настроек')
+            print('Ошибка [!]: Ошибка добавления новых настроек')
     
     def getSettings(self):
         global settings
@@ -234,7 +237,7 @@ class ServerSettingsManager():
         try:
             tree = xml.ElementTree(file=self.filename)
         except IOError:
-            print("Создайте файл перед проверкой корректности его формата")
+            print("Ошибка [!]: Создайте файл перед проверкой корректности его формата")
             return
         
         root = tree.getroot()
@@ -260,22 +263,22 @@ class ServerSettingsManager():
         result = True
 
         if settings['q'] is None:
-            print("Необходимо указать q")
+            print("Ошибка [!]: Необходимо указать q")
             result = False
         if settings['g'] is None:
-            print("Необходимо указать g")
+            print("Ошибка [!]: Необходимо указать g")
             result = False
         if settings['id'] is None:
-            print("Необходимо указать id")
+            print("Ошибка [!]: Необходимо указать id")
             result = False
         if settings['M'] is None:
-            print("Необходимо указать M")
+            print("Ошибка [!]: Необходимо указать M")
             result = False
         if settings['N'] is None:
-            print("Необходимо указать N")
+            print("Ошибка [!]: Необходимо указать N")
             result = False
         elif settings['port'] is None:
-            print("Необходимо указать port")
+            print("Ошибка [!]: Необходимо указать port")
             result = False
 
         return result
@@ -312,7 +315,7 @@ def dbOptions(new: str, dele: str, upd: str):
     if (newExists and updExists) or \
         (delExists and updExists) or \
         (delExists and newExists):
-        print("Выберите только одну опцию n/d/u")
+        print("Ошибка [!]: Выберите только одну опцию n/d/u")
         return False
 
     dbm = DatabaseManager('./s3pake.db')
@@ -323,7 +326,8 @@ def dbOptions(new: str, dele: str, upd: str):
         result = re.search(regex, new)
 
         if result is None:
-            print("Формат передачи данных нового пользователя: \'id:pw\'")
+            print("Ошибка [!]: Переданы некорректные значения")
+            print("Ошибка [!]: Формат передачи данных нового пользователя: \'id:pw\'")
             return False
 
         id = int(result.group(1))
@@ -338,7 +342,8 @@ def dbOptions(new: str, dele: str, upd: str):
         result = re.search(regex, new)
 
         if result is None:
-            print("Формат передачи данных для обновления пароля пользователя: \'id:pw\'")
+            print("Ошибка [!]: Переданы некорректные значения")
+            print("Ошибка [!]: Формат передачи данных для обновления пароля пользователя: \'id:pw\'")
             return False
 
         id = int(result.group(1))
@@ -370,7 +375,7 @@ def main():
     csm = ServerSettingsManager()
 
     if not csm.checkSettingsFile():
-        print("Поврежден файл с настройками клиента")
+        print("Ошибка [!]: Поврежден файл с настройками клиента")
         return
 
     settingsDict = csm.addSettings(options.__dict__)
@@ -380,22 +385,30 @@ def main():
 
     csm.getSettings()
 
-    if not dbOptions(options['new'], options['del'], options['upd']):
+    if not dbOptions(options.__dict__['new'], options.__dict__['del'], options.__dict__['upd']):
         return
 
-    """This runs the protocol on port 1997"""
     factory = protocol.ServerFactory()
     factory.protocol = TrustedServer
-    print('Starting trusted server S [*]: id = ', settings['id'])
-    print('Starting client S [*]: port = ', settings['port'])
-    print('Starting client S [*]: listening')
-    print('Connection public parameters [*]: q = ', settings['q'])
-    print('Connection public parameters [*]: g = ', settings['g'])
-    print('Connection public parameters [*]: M = ', settings['M'])
-    print('Connection public parameters [*]: N = ', settings['N'], '\n')
-    reactor.listenTCP(settings['port'], factory)
+    print("[*]: Запуск доверенного сервера")
+    print("[*]: Параметры сети")
+    print('[*]: \tport = ', settings['port'])
+    print("[*]: Параметры протокола")
+    print('[*]: \tid = ', settings['id'])    
+    print('[*]: \tq = ', settings['q'])
+    print('[*]: \tg = ', settings['g'])
+    print('[*]: \tM = ', settings['M'])
+    print('[*]: \tN = ', settings['N'], '\n')
+    
+    try:
+        reactor.listenTCP(settings['port'], factory)
+    except:
+        print("[*]: Ошибка при инициализации порта")
+
+    print("[*]: Сервер готов")    
+    print("[*]: Ожидание подключений...")
+
     reactor.run()
 
-# this only runs if the module was *not* imported
 if __name__ == '__main__':
     main()
