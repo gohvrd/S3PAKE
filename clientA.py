@@ -1,11 +1,9 @@
 from twisted.internet import reactor, protocol
-
 from random import seed, randint
 from struct import pack, unpack
 from optparse import OptionParser
 import re
 import xml.etree.ElementTree as xml
-import public
 
 settings = {
     'port': None,
@@ -39,22 +37,22 @@ class ClientInitiator(protocol.Protocol):
 
     def connectionMade(self):
         self.transport.write(self.connectionInitializationMessage())
-        print('A action [*]: sending A||X to B\n')
+        print("[*A→B S*]: A||X")
  
     def dataReceived(self, data):
         beta = self.responseMessageHandler(data)
 
         if beta is not None:
-            print('\nA calculates [*]: beta = ', beta)
-            print('A action [*]: sending beta to B\n')
+            print("[*]: Вычисляется beta = {0:d}".format(beta))
+            print("[*A→B S*]: beta")
 
             message = pack('q', beta)
             self.transport.write(message)
-            print("A calculates [$COMPLETE$]: session key = ", self.SK)
+            print("[$Выполнено$]: SK = ", self.SK)
 
             self.transport.loseConnection()
         else:
-            print("Error [!]: Wrong alpha.")
+            print("Ошибка [!]: Получено неверное значение alpha.")
             self.transport.loseConnection()
 
     def connectionLost(self, reason):
@@ -63,11 +61,9 @@ class ClientInitiator(protocol.Protocol):
     def connectionInitializationMessage(self):
         seed()
         self.x = randint(1, self.settings['q'] - 1)
-        print('A action [*]: choosing random number x from Zp')
-        print('A paramteters [*]: x = ', self.x)
+        print("[*]: Выбирается случайное x = {0:d} из Zp".format(self.x))
         X = self.settings['g'] ** self.x * self.settings['M'] ** self.settings['pw']
-        print('A action [*]: calculating X')
-        print('A paramteters [*]: X = ', X)
+        print("[*]: Вычисляется X = {0:d}".format(X))
 
         return pack('hxq', self.settings['id'], X)
 
@@ -76,22 +72,23 @@ class ClientInitiator(protocol.Protocol):
 
     def responseMessageHandler(self, message):
         S_Y, alpha = unpack('qxq', message)
-        print('A action [*]: receiving S_Y||alpha from B')
-        print('S paramteters (received) [*]: S_Y = ', S_Y)
-        print('B paramteters (received) [*]: alpha = ', alpha, '\n')
+        print("[*A←B S*]: S_Y||alpha")
+        print("[*]: \tS_Y = {0:d}".format(S_Y))
+        print("[*]: \talpha = {0:d}".format(alpha))
         self.g_power_yz = int(S_Y / (G((self.settings['id'], self.settings['sid'], self.settings['g'] ** self.x)) ** self.settings['pw']))
-        print('A calculates [*]: g^(yz) = ', self.g_power_yz)
+        print("[*]: Вычисляется g^(yz) = {0:d}".format(self.g_power_yz))
 
         test_alpha = int(G((self.settings['id'], self.settings['uid'], self.g_power_yz ** self.x)))
         
-        print('A action [*]: independently calculate the alpha\' and compare it with the alpha')
+        print("[*]: Проверка полученного значения alpha")
+        print("[*]: Самостоятельное вычисление alpha\' = {0:d}".format(test_alpha))
 
         if alpha == test_alpha:
-            print('A action [*]: alpha\' = alpha')
+            print("[*]: alpha\' = alpha")
             self.SK = H((self.settings['id'], self.settings['uid'], self.g_power_yz ** self.x))
             return self.betaMessage()
 
-        print('A action [*]: alpha\' != alpha')
+        print("[*]: alpha\' != alpha")
 
         return None
 
@@ -148,30 +145,31 @@ class ClientListner(protocol.Protocol):
         self.transport.write(data)
 
     def receiveConnectRequest(self, message):        
-        print('B action [*]: receiving A||X from A\n')
+        print("[*A→B S*]: A||X")
         self.initId, X = unpack('hxq', message)
-        print('B action [*]: choosing random number y from Zp') 
-        print('B paramteters [*]: y = ', self.y)
+        print("[*]: \tA = {0:d}".format(self.initId))
+        print("[*]: \tX = {0:d}".format(X))
+        print("[*]: Выбирается случайное y = {0:d} из Zp".format(self.y))
         Y = self.settings['g'] ** self.y * self.settings['N'] ** self.settings['pw']
-        print('B action [*]: calculating Y') 
-        print('B paramteters [*]: Y = ', Y)
+        print("[*]: Вычисляется Y = {0:d}".format(Y))
 
-        print('B action [*]: sending A||X||B||Y to S\n')
+        print("[*A B→S*]: A||X||B||Y")
 
         return message + pack('hxq', self.settings['id'], Y)
 
     def receiveBeta(self, beta):
         recv_beta = unpack('q', beta)[0]
-        print('B action [*]: receiving beta from A')
-        print('A paramteters (received) [*]: beta = ', recv_beta)
-        print('B action [*]: independently calculate the beta\' and compare it with the beta')
+        print("[*A→B S*]: beta")
+        print("[*]: \tbeta = {0:d}".format(recv_beta))
+        print("[*]: Проверка полученного значения beta")
+        print("[*]: Самостоятельное вычисление beta\'")
         if recv_beta == int(G((self.settings['id'], self.initId, self.proxy_to_server_protocol.g_power_xz ** self.y))):
-            print('B action [*]: beta\' = beta\n')
+            print("[*]: beta\' = beta")
             self.SK = H((self.initId, self.settings['id'], self.proxy_to_server_protocol.g_power_xz ** self.y))
-            print("B calculates [$COMPLETE$]: session key = ", self.SK)
+            print("[$Выполнено$]: SK = {0:d}".format(self.SK))
         else:
-            print('B action [*]: beta\' != beta')
-            print("Error [!]: Wrong beta.")
+            print("[*]: beta\' != beta")
+            print("Ошибка [!]: Получено неверное значение beta")
 
         reactor.stop()
 
@@ -201,15 +199,15 @@ class ClientProxy(protocol.Protocol):
 
     def receiveTrustedServerResponse(self, response):
         S_X, S_Y = unpack('qxq', response)
-        print('B action [*]: receiving S_X||S_Y from S')
-        print('S paramteters (received) [*]: S_X = ', S_X)
-        print('S paramteters (received) [*]: S_Y = ', S_Y, '\n')
+        print("[*A B←S*]: S_X||S_Y")
+        print("[*]: \tS_X = {0:d}".format(S_X))
+        print("[*]: \tS_Y = {0:d}".format(S_Y))
         self.g_power_xz = int(S_X / G((self.settings['id'], self.settings['sid'], self.settings['g'] ** self.factory.server.y)) ** self.settings['pw'])
-        print('B calculates [*]: g^(xz) = ', self.g_power_xz)
+        print("[*]: Вычисление g^(xz) = {0:d}".format(self.g_power_xz))
         alpha = int(G((self.factory.server.initId, self.settings['id'], self.g_power_xz ** self.factory.server.y)))
-        print('B calculates [*]: alpha = ', alpha)
+        print("[*]: Вычисление alpha = {0:d}".format(alpha))
 
-        print('B action [*]: sending S_Y||alpha to A\n')
+        print("[*A←B S*]: S_Y||alpha")
 
         return pack('qxq', S_Y, alpha)
 
@@ -266,13 +264,13 @@ class ClientSettingsManager():
         try:
             tree.write(self.filename, xml_declaration=True)   
         except:
-            print('Ошибка создания файла настроек')
+            print("Ошибка [!]: Ошибка создания файла настроек")
 
     def setSettings(self, inSettings: dict):
         global settings
 
         if type(inSettings) is not dict:
-            print("Передавать настройки можно только в словаре, передан: %s" % type(inSettings))
+            print("Ошибка [!]: Передавать настройки можно только в словаре, передан: %s" % type(inSettings))
             return
 
         try:
@@ -292,7 +290,7 @@ class ClientSettingsManager():
         try:
             tree.write(self.filename)
         except:
-            print('Ошибка добавления новых настроек')
+            print("Ошибка [!]: Ошибка добавления новых настроек")
     
     def getSettings(self):
         global settings
@@ -315,7 +313,7 @@ class ClientSettingsManager():
         try:
             tree = xml.ElementTree(file=self.filename)
         except IOError:
-            print("Создайте файл перед проверкой корректности его формата")
+            print("Ошибка [!]: Создайте файл перед проверкой корректности его формата")
             return
         
         root = tree.getroot()
@@ -344,19 +342,19 @@ class ClientSettingsManager():
         result = True
 
         if settings['q'] is None:
-            print("Необходимо указать q")
+            print("Ошибка [!]: Необходимо указать q")
             result = False
         if settings['g'] is None:
-            print("Необходимо указать g")
+            print("Ошибка [!]: Необходимо указать g")
             result = False
         if settings['id'] is None:
-            print("Необходимо указать id")
+            print("Ошибка [!]: Необходимо указать id")
             result = False
         if settings['sid'] is None:
-            print("Необходимо указать sid")
+            print("Ошибка [!]: Необходимо указать sid")
             result = False
         if settings['pw'] is None:
-            print("Необходимо указать pw")
+            print("Ошибка [!]: Необходимо указать pw")
             result = False
 
         return result
@@ -365,10 +363,10 @@ class ClientSettingsManager():
         result = self.generalCheckSettings(settings)
 
         if settings['M'] is None:
-            print("Необходимо указать M")
+            print("Ошибка [!]: Необходимо указать M")
             result = False
         elif settings['uid'] is None:
-            print("Необходимо указать uid")
+            print("Ошибка [!]: Необходимо указать uid")
             result = False
         
         return result
@@ -377,16 +375,16 @@ class ClientSettingsManager():
         result = self.generalCheckSettings(settings)
         
         if settings['N'] is None:
-            print("Необходимо указать N")
+            print("Ошибка [!]: Необходимо указать N")
             result = False
         elif settings['port'] is None:
-            print("Необходимо указать port")
+            print("Ошибка [!]: Необходимо указать port")
             result = False
         elif settings['sip'] is None:
-            print("Необходимо указать sip")
+            print("Ошибка [!]: Необходимо указать sip")
             result = False
         elif settings['sport'] is None:
-            print("Необходимо указать sport")
+            print("Ошибка [!]: Необходимо указать sport")
             result = False
 
         return result
@@ -446,14 +444,47 @@ def connectionAddressParser(address):
         port = int(result.group(2))
 
         if not port in range(0, 65536):
-            print('Неверное значение порта')
+            print("Ошибка [!]: Неверное значение порта")
 
         return (ip, port)
 
+    print("Ошибка [!]: Неверный формат ip-адреса. Ожидается: \"ip:port\"")
+
     return (None, None)
 
-    print('Неверный формат ip-адреса. Ожидается: \"ip:port\"')
-    return False
+
+def printOptions(isInitiator, port = None, uip = None, uport = None):
+    print("[*]: Запуск легального клиента")
+
+    if isInitiator:
+        print("[*]: Режим инициатора")
+        print("[*]:")
+    else:
+        print("[*]: Режим ожидания инициатора")
+        print("[*]:")
+        print("[*]: Параметры сети")
+        print("[*]: \tport = {0:d}".format(port))
+
+    print("[*]: Параметры клиента (секретные)")
+    print("[*]: \tpw = {0:d}".format(settings['pw']))
+    print("[*]: Параметры клиента (публичные)")
+    print("[*]: \tid = {0:d}".format(settings['id']))
+    print("[*]: \tq = {0:d}".format(settings['q']))
+    print("[*]: \tg = {0:d}".format(settings['g']))
+
+    if isInitiator:
+        print("[*]: \tM = {0:d}".format(settings['M']))
+        print("[*]: Параметры принимающего клиента")
+        print("[*]: \tid = {0:d}".format(settings['uid']))
+        print("[*]: \tip = {0:s}".format(uip))
+        print("[*]: \tport = {0:d}".format(uport))
+    else:
+        print("[*]: \tN = {0:d}".format(settings['N']))
+        print("[*]: Параметры сервера")
+        print("[*]: \tid = {0:d}".format(settings['sid']))
+        print("[*]: \tip = {0:s}".format(settings['sip']))
+        print("[*]: \tport = {0:d}".format(settings['sport']))
+
 
 def main():
     global settings
@@ -479,7 +510,7 @@ def main():
     csm = ClientSettingsManager()
 
     if not csm.checkSettingsFile():
-        print("Поврежден файл с настройками клиента")
+        print("Ошибка [!]: Поврежден файл с настройками клиента")
         return
 
     settingsDict = csm.addSettings(options.__dict__)
@@ -487,46 +518,58 @@ def main():
     if settingsDict != {}:
         csm.setSettings(settingsDict)                
 
-    csm.getSettings()
-
-    print('Starting client A [*]: id = ', settings['id'])
-    print('Connection public parameters [*]: q = ', settings['q'])
-    print('Connection public parameters [*]: g = ', settings['g'])
-    print('Connection public parameters [*]: M = ', settings['M'], '\n')
-
-    if options.__dict__['connect'] is not None:
-        print("Подключение")
+    csm.getSettings()   
+        
+    if options.__dict__['connect'] is not None:        
         if options.__dict__['listen']:
-            print('Одновременно можно выбрать только один режим работы')
+            print('Ошибка [!]: Одновременно можно выбрать только один режим работы')
             return
 
         if not csm.initiatorCheckSettings(settings):
-            print("Не правильно сконфигурирован инициатор")
+            print("Ошибка [!]: Не правильно сконфигурирован инициатор")
             return
 
         ip, port = connectionAddressParser(options.__dict__['connect'])
 
+        printOptions(isInitiator=True, uip=ip, uport=port)
+
         if ip is not None and port is not None:
             f = ClientInitiatorFactory()
-            reactor.connectTCP(ip, port, f)
-            print('Starting client A [*]: connecting')
+            try:
+                reactor.connectTCP(ip, port, f)
+            except:
+                print("Ошибка [!]: Ошибка сети - Не удалось подключиться к клиенту {0:s}:{1:d}".format(ip, port))
         else:
-            print('Ошибка при подключении')
-            return
-    elif options.__dict__['listen']:
-        if not csm.listnerCheckSettings(settings):
-            print("Не правильно сконфигурирован принимающий клиент")
+            print("Ошибка [!]: Укажите корректные значения ip и port")
             return
 
-        port = settings['port']
+        print("[*]:")
+        print("[*]: Клиент готов")
+        print("[*]: Подключение...")
+        print("[*]:")    
+    elif options.__dict__['listen']:
+        if not csm.listnerCheckSettings(settings):
+            print("Ошибка [!]: Не правильно сконфигурирован принимающий клиент")
+            return
+
+        port = settings['port']                
+
+        printOptions(isInitiator=False, port=port)
 
         factory = protocol.ServerFactory()
         factory.protocol = ClientListner
-        reactor.listenTCP(port, factory)        
+        try:
+            reactor.listenTCP(port, factory)
+        except:
+            print("Ошибка [!]: Ошибка при инициализации порта")
+
+        print("[*]:")
+        print("[*]: Клиент готов")
+        print("[*]: Ожидание подключения...")
+        print("[*]:")
 
     #mitm
     #reactor.connectTCP(public.MITM_IP, public.MITM_AS_B_CLIENT_PORT, f)
-    print("Успех")
     reactor.run()
 
 

@@ -15,16 +15,23 @@ settings = {
     'N': None    
 }
 
+sessionNum = 1
+
 def G(values: tuple):
     return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
 
 class TrustedServer(protocol.Protocol):
     def __init__(self):
-        global settings
+        global settings, sessionNum
 
         self.settings = settings
-        self.sessionNum = 1
+        self.sessionNum = sessionNum
         self.dbm = DatabaseManager('./s3pake.db')
+
+    def incrementSessionNumber(self):
+        global sessionNum
+
+        sessionNum = self.sessionNum + 1
 
     def dataReceived(self, data):
         print("[*]: Сеанс №{0:d}".format(self.sessionNum))
@@ -33,13 +40,13 @@ class TrustedServer(protocol.Protocol):
         z = randint(1, self.settings['q'] - 1)
         A, X, B, Y = unpack('hxqhxq', data)
 
-        print("Получено сообщение [*]: A||X||B||Y от пользователя с id = {0:d}".format(B))
+        print("[*A B→S*]: A||X||B||Y от пользователя с id = {0:d}".format(B))
         print("[*]: \tA = {0:d}".format(A))
         print("[*]: \tX = {0:d}".format(X))
         print("[*]: \tB = {0:d}".format(B))
-        print("[*]: \tY = {0:d}\n".format(Y))
+        print("[*]: \tY = {0:d}".format(Y))
 
-        print("[*]: Выбирается случайное z = {0:d}".format(z))   
+        print("[*]: Выбирается случайное z = {0:d} из Zp".format(z))   
         
         pwA = self.dbm.getPwById(A)
         pwB = self.dbm.getPwById(B)
@@ -53,9 +60,9 @@ class TrustedServer(protocol.Protocol):
         print("[*]: Вычисляется S_X = {0:d}".format(S_X))
         S_Y = int((gPowerY ** z) * (G((A, self.settings['id'], gPowerX)) ** pwA))
         print("[*]: Вычисляется S_Y = {0:d}".format(S_Y))
-        print("Отправлено сообщение [*]: S_X||S_Y\n")
+        print("[*A B←S*]: S_X||S_Y\n")
 
-        self.sessionNum += 1
+        self.incrementSessionNumber()
 
         self.transport.write(pack("qxq", S_X, S_Y))        
 
@@ -87,7 +94,7 @@ class DatabaseManager():
         if cursor.rowcount == 0:
             print("Ошибка [!]: Пользователя с id = {0:d} не существует".format(id))
         else:
-            print("Количество обновленных строк: {0:d}".format(cursor.rowcount))
+            print("[*]: Количество обновленных строк: {0:d}".format(cursor.rowcount))
 
         connection.commit()
         
@@ -126,7 +133,7 @@ class DatabaseManager():
         except:
             print("Ошибка [!]: Ошибка регистрации пользователя (id = {0:d})".format(id))
 
-        print("Пользователь успешно зарегистрирован (id = {0:d})".format(id))
+        print("[*]: Пользователь успешно зарегистрирован (id = {0:d})".format(id))
 
         connection.commit()
         
@@ -144,7 +151,7 @@ class DatabaseManager():
         if cursor.rowcount == 0:
             print("Ошибка [!]: Пользователя с id = {0:d} не существует".format(id))
         else:
-            print("Пользователь успешно удален (id = {0:d})".format(id))
+            print("[*]: Пользователь успешно удален (id = {0:d})".format(id))
 
         connection.commit()
         
@@ -391,6 +398,7 @@ def main():
     factory = protocol.ServerFactory()
     factory.protocol = TrustedServer
     print("[*]: Запуск доверенного сервера")
+    print("[*]:")
     print("[*]: Параметры сети")
     print('[*]: \tport = ', settings['port'])
     print("[*]: Параметры протокола")
@@ -398,15 +406,17 @@ def main():
     print('[*]: \tq = ', settings['q'])
     print('[*]: \tg = ', settings['g'])
     print('[*]: \tM = ', settings['M'])
-    print('[*]: \tN = ', settings['N'], '\n')
+    print('[*]: \tN = ', settings['N'])
     
     try:
         reactor.listenTCP(settings['port'], factory)
     except:
-        print("[*]: Ошибка при инициализации порта")
+        print("Ошибка [!]: Ошибка при инициализации порта")
 
+    print("[*]:")
     print("[*]: Сервер готов")    
     print("[*]: Ожидание подключений...")
+    print("[*]:")
 
     reactor.run()
 
