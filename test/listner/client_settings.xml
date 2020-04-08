@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='us-ascii'?>
+<settings>
+    <network>
+        <port>3456</port>
+    </network>
+    <private>
+        <pw>1</pw>
+    </private>
+    <public>
+        <id>222</id>
+        <q>3</q>
+        <g>2</g>
+        <M></M>
+        <N>8</N>
+    </public>
+    <server>
+        <sid>333</sid>
+        <sip>127.0.0.1</sip>
+        <sport>1997</sport>
+    </server>
+    <user>
+        <uid></uid>
+    </user>
+</settings>
