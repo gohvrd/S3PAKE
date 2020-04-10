@@ -23,11 +23,14 @@ settings = {
     'smport': None
 }
 
-def H(values: tuple):
-    return (values[0] + values[1] / 2 + values[2]) % 100 + 1
+def G(values: tuple):    
+    #return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
+    return settings['g'] ** ((values[0] + values[1] + values[2]) % settings['q'])
 
-def G(values: tuple):
-    return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
+
+def H(values: tuple):
+    #return (values[0] + values[1] / 2 + values[2]) % 100 + 1
+    return settings['g'] ** ((values[0] + values[1] * values[2]) % settings['q'])
 
 
 class ClientInitiator(protocol.Protocol):
@@ -128,7 +131,7 @@ class ClientListner(protocol.Protocol):
         proxy_to_server_factory.protocol = ClientProxy
         proxy_to_server_factory.server = self
 
-        if settings['mitm']:
+        if settings.get('mitm') is not None:
             reactor.connectTCP(self.settings['smip'], self.settings['smport'], proxy_to_server_factory)
         else:
             reactor.connectTCP(self.settings['sip'], self.settings['sport'], proxy_to_server_factory)       
@@ -217,8 +220,8 @@ class ClientProxy(protocol.Protocol):
 
 
 class ClientSettingsManager():
-    def __init__(self):
-        self.filename = 'client_settings.xml'
+    def __init__(self, filename):
+        self.filename = filename
 
         try:
             open(self.filename, 'r')
@@ -393,10 +396,10 @@ class ClientSettingsManager():
         if settings['M'] is None:
             print("Ошибка [!]: Необходимо указать M")
             result = False
-        elif settings['uid'] is None:
+        if settings['uid'] is None:
             print("Ошибка [!]: Необходимо указать uid")
             result = False
-        elif settings['mitm']:
+        if settings.get('mitm') is not None:
             if settings['umip'] is None:
                 print("Ошибка [!]: Необходимо указать umip")
                 result = False
@@ -410,22 +413,22 @@ class ClientSettingsManager():
         
         return result
 
-    def listnerCheckSettings(self, settings):
+    def listenerCheckSettings(self, settings):
         result = self.generalCheckSettings(settings)
         
         if settings['N'] is None:
             print("Ошибка [!]: Необходимо указать N")
             result = False
-        elif settings['port'] is None:
+        if settings['port'] is None:
             print("Ошибка [!]: Необходимо указать port")
             result = False
-        elif settings['sip'] is None:
+        if settings['sip'] is None:
             print("Ошибка [!]: Необходимо указать sip")
             result = False
-        elif settings['sport'] is None:
+        if settings['sport'] is None:
             print("Ошибка [!]: Необходимо указать sport")
             result = False
-        elif settings['mitm']:
+        if settings.get('mitm') is not None:
             if settings['usip'] is None:
                 print("Ошибка [!]: Необходимо указать usip")
                 result = False
@@ -437,52 +440,14 @@ class ClientSettingsManager():
                 print("Ошибка [!]: Необходимо указать usport")
                 result = False  
 
-        return result
+        return result    
 
     def addSettings(self, options):
         settingsDict = {}
 
-        if options['port'] is not None:
-            settingsDict['port'] = options['port']
-
-        if options['pw'] is not None:
-            settingsDict['pw'] = options['pw']
-
-        if options['q'] is not None:
-            settingsDict['q'] = options['q']
-
-        if options['g'] is not None:
-            settingsDict['g'] = options['g']
-
-        if options['M'] is not None:
-            settingsDict['M'] = options['M']
-
-        if options['N'] is not None:
-            settingsDict['N'] = options['N']
-
-        if options['sid'] is not None:
-            settingsDict['sid'] = options['sid']
-
-        if options['sip'] is not None:
-            settingsDict['sip'] = options['sip']
-
-        if options['sport'] is not None:
-            settingsDict['sport'] = options['sport']
-
-        if options['uid'] is not None:
-            settingsDict['uid'] = options['uid']
-
-        if options['umip'] is not None:
-            settingsDict['umip'] = options['umip']
-
-        if options['umport'] is not None:
-            settingsDict['umport'] = options['umport']
-
-        if options['smip'] is not None:
-            settingsDict['smip'] = options['smip']
-
-        if options['smport'] is not None:
-            settingsDict['smport'] = options['smport']
+        for name in settings.keys():
+            if options[name] is not None:
+                settingsDict[name] = options[name]
 
         return settingsDict
 
@@ -555,6 +520,7 @@ def main():
     optionParser = OptionParser()
     
     optionParser.add_option('-p', '--port', action='store')
+    optionParser.add_option('-d', '--id', action='store')
     optionParser.add_option('-w', '--pw', action='store')
     optionParser.add_option('-q', '--q', action='store')
     optionParser.add_option('-g', '--g', action='store')
@@ -577,23 +543,25 @@ def main():
 
     (options, arguments) = optionParser.parse_args()
 
-    csm = ClientSettingsManager()
-
-    if not csm.checkSettingsFile():
-        print("Ошибка [!]: Поврежден файл с настройками клиента")
-        return
-
-    settingsDict = csm.addSettings(options.__dict__)
-    
-    if settingsDict != {}:
-        csm.setSettings(settingsDict)                
-
-    csm.getSettings()   
+      
         
     if options.__dict__['connect'] is not None:        
         if options.__dict__['listen']:
             print('Ошибка [!]: Одновременно можно выбрать только один режим работы')
             return
+
+        csm = ClientSettingsManager('cclient_settings.xml')
+
+        if not csm.checkSettingsFile():
+            print("Ошибка [!]: Поврежден файл с настройками клиента")
+            return
+
+        settingsDict = csm.addSettings(options.__dict__)
+    
+        if settingsDict != {}:
+            csm.setSettings(settingsDict)                
+
+        csm.getSettings() 
 
         if not csm.initiatorCheckSettings(settings):
             print("Ошибка [!]: Не правильно сконфигурирован инициатор")
@@ -601,7 +569,7 @@ def main():
 
         ip, port = (None, None)
 
-        if options.__dict__['mitm']:
+        if options.__dict__['mitm'] :
             ip = settings['umip']
             port = settings['umport']
         else:
@@ -624,7 +592,20 @@ def main():
         print("[*]: Подключение...")
         print("[*]:")    
     elif options.__dict__['listen']:
-        if not csm.listnerCheckSettings(settings):
+        csm = ClientSettingsManager('lclient_settings.xml')
+
+        if not csm.checkSettingsFile():
+            print("Ошибка [!]: Поврежден файл с настройками клиента")
+            return
+
+        settingsDict = csm.addSettings(options.__dict__)
+    
+        if settingsDict != {}:
+            csm.setSettings(settingsDict)                
+
+        csm.getSettings() 
+
+        if not csm.listenerCheckSettings(settings):
             print("Ошибка [!]: Не правильно сконфигурирован принимающий клиент")
             return
 

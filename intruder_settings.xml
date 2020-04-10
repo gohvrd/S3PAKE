@@ -1,0 +1,29 @@
+<settings>
+    <network>
+        <port>5678</port>
+        <extport>6789</extport>
+    </network>
+    <private>
+        <pw>3</pw>
+    </private>
+    <public>
+        <id>444</id>
+        <q>4</q>
+        <g>2</g>
+        <M>2</M>
+        <N>4</N>
+    </public>
+    <userA>
+        <aid>111</aid>
+    </userA>
+    <userB>
+        <bid>222</bid>
+        <bip>127.0.0.1</bip>
+        <bport>3456</bport>
+    </userB>
+    <server>
+        <sid>333</sid>
+        <sip>127.0.0.1</sip>
+        <sport>1997</sport>
+    </server>
+</settings>

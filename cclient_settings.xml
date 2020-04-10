@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='us-ascii'?>
+<settings>
+    <network>
+        <port></port>
+    </network>
+    <private>
+        <pw>2</pw>
+    </private>
+    <public>
+        <id>111</id>
+        <q>4</q>
+        <g>2</g>
+        <M>2</M>
+        <N></N>
+    </public>
+    <server>
+        <sid>333</sid>
+        <sip></sip>
+        <sport></sport>
+    </server>
+    <user>
+        <uid>222</uid>
+    </user>
+    <mitm><umip /><umport /><smip /><smport /></mitm>
+</settings>

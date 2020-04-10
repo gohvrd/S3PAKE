@@ -5,9 +5,9 @@
     </network>
     <public>
         <id>333</id>
-        <q>3</q>
+        <q>4</q>
         <g>2</g>
-        <M>4</M>
-        <N>8</N>
+        <M>2</M>
+        <N>4</N>
     </public>
 </settings>

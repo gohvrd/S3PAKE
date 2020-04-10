@@ -18,7 +18,7 @@ settings = {
 sessionNum = 1
 
 def G(values: tuple):
-    return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
+    return settings['g'] ** ((values[0] + values[1] + values[2]) % settings['q'])
 
 class TrustedServer(protocol.Protocol):
     def __init__(self):
@@ -55,7 +55,7 @@ class TrustedServer(protocol.Protocol):
         print("[*]: Вычисляется g^x = {0:d}".format(gPowerX))
         gPowerY = int(Y / self.settings['N'] ** pwB)
         print("[*]: Вычисляется g^y = {0:d}".format(gPowerY))
-
+        
         S_X = int((gPowerX ** z) * (G((B, self.settings['id'], gPowerY)) ** pwB))
         print("[*]: Вычисляется S_X = {0:d}".format(S_X))
         S_Y = int((gPowerY ** z) * (G((A, self.settings['id'], gPowerX)) ** pwA))

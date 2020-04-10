@@ -29,6 +29,14 @@
             "args": ["-d", "1"]
         },
         {
+            "name": "offline",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["-o"]
+        },
+        {
             "name": "Python: Текущий файл",
             "type": "python",
             "request": "launch",
