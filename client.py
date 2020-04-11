@@ -20,8 +20,10 @@ settings = {
     'umip': None,
     'umport': None,
     'smip': None,
-    'smport': None
+    'smport': None    
 }
+
+mitm = False
 
 def G(values: tuple):    
     #return (int((values[0] + int(values[1] / 2)) / 2) + values[2]) % 10 + 1
@@ -30,7 +32,7 @@ def G(values: tuple):
 
 def H(values: tuple):
     #return (values[0] + values[1] / 2 + values[2]) % 100 + 1
-    return settings['g'] ** ((values[0] + values[1] * values[2]) % settings['q'])
+    return settings['g'] ** ((values[0] + values[1] + values[2]) % settings['q'])
 
 
 class ClientInitiator(protocol.Protocol):
@@ -44,18 +46,18 @@ class ClientInitiator(protocol.Protocol):
 
     def connectionMade(self):
         self.transport.write(self.connectionInitializationMessage())
-        print("[*A→B S*]: A||X")
+        print("\n[*A→B S*]: A||X")
  
     def dataReceived(self, data):
         beta = self.responseMessageHandler(data)
 
         if beta is not None:
             print("[*]: Вычисляется beta = {0:d}".format(beta))
-            print("[*A→B S*]: beta")
+            print("\n[*A→B S*]: beta")
 
             message = pack('q', beta)
             self.transport.write(message)
-            print("[$Выполнено$]: SK = {0:d}".format(self.SK))
+            print("\n[$Выполнено$]: SK = {0:d}".format(self.SK))
 
             self.transport.loseConnection()
         else:
@@ -79,7 +81,7 @@ class ClientInitiator(protocol.Protocol):
 
     def responseMessageHandler(self, message):
         S_Y, alpha = unpack('qxq', message)
-        print("[*A←B S*]: S_Y||alpha")
+        print("[*A←B S*]: S_Y||alpha\n")
         print("[*]: \tS_Y = {0:d}".format(S_Y))
         print("[*]: \talpha = {0:d}".format(alpha))
         self.g_power_yz = int(S_Y / (G((self.settings['id'], self.settings['sid'], self.settings['g'] ** self.x)) ** self.settings['pw']))
@@ -112,13 +114,14 @@ class ClientInitiatorFactory(protocol.ClientFactory):
 
 class ClientListner(protocol.Protocol):
     def __init__(self):
-        global settings
+        global settings, mitm
 
         self.settings = settings
         seed()
         self.y = randint(1, self.settings['q'] - 1)
         self.SK = None
         self.initId = None
+        self.mitm = mitm
 
         self.buffer = None
         self.proxy_to_server_protocol = None
@@ -131,7 +134,7 @@ class ClientListner(protocol.Protocol):
         proxy_to_server_factory.protocol = ClientProxy
         proxy_to_server_factory.server = self
 
-        if settings.get('mitm') is not None:
+        if self.mitm:
             reactor.connectTCP(self.settings['smip'], self.settings['smport'], proxy_to_server_factory)
         else:
             reactor.connectTCP(self.settings['sip'], self.settings['sport'], proxy_to_server_factory)       
@@ -152,7 +155,7 @@ class ClientListner(protocol.Protocol):
         self.transport.write(data)
 
     def receiveConnectRequest(self, message):        
-        print("[*A→B S*]: A||X")
+        print("[*A→B S*]: A||X\n")
         self.initId, X = unpack('hxq', message)
         print("[*]: \tA = {0:d}".format(self.initId))
         print("[*]: \tX = {0:d}".format(X))
@@ -160,20 +163,20 @@ class ClientListner(protocol.Protocol):
         Y = self.settings['g'] ** self.y * self.settings['N'] ** self.settings['pw']
         print("[*]: Вычисляется Y = {0:d}".format(Y))
 
-        print("[*A B→S*]: A||X||B||Y")
+        print("\n[*A B→S*]: A||X||B||Y")
 
         return message + pack('hxq', self.settings['id'], Y)
 
     def receiveBeta(self, beta):
         recv_beta = unpack('q', beta)[0]
-        print("[*A→B S*]: beta")
+        print("[*A→B S*]: beta\n")
         print("[*]: \tbeta = {0:d}".format(recv_beta))
         print("[*]: Проверка полученного значения beta")
         print("[*]: Самостоятельное вычисление beta\'")
         if recv_beta == int(G((self.settings['id'], self.initId, self.proxy_to_server_protocol.g_power_xz ** self.y))):
             print("[*]: beta\' = beta")
             self.SK = int(H((self.initId, self.settings['id'], self.proxy_to_server_protocol.g_power_xz ** self.y)))
-            print("[$Выполнено$]: SK = {0:d}".format(self.SK))
+            print("\n[$Выполнено$]: SK = {0:d}".format(self.SK))
         else:
             print("[*]: beta\' != beta")
             print("Ошибка [!]: Получено неверное значение beta")
@@ -206,7 +209,7 @@ class ClientProxy(protocol.Protocol):
 
     def receiveTrustedServerResponse(self, response):
         S_X, S_Y = unpack('qxq', response)
-        print("[*A B←S*]: S_X||S_Y")
+        print("[*A B←S*]: S_X||S_Y\n")
         print("[*]: \tS_X = {0:d}".format(S_X))
         print("[*]: \tS_Y = {0:d}".format(S_Y))
         self.g_power_xz = int(S_X / G((self.settings['id'], self.settings['sid'], self.settings['g'] ** self.factory.server.y)) ** self.settings['pw'])
@@ -214,7 +217,7 @@ class ClientProxy(protocol.Protocol):
         alpha = int(G((self.factory.server.initId, self.settings['id'], self.g_power_xz ** self.factory.server.y)))
         print("[*]: Вычисление alpha = {0:d}".format(alpha))
 
-        print("[*A←B S*]: S_Y||alpha")
+        print("\n[*A←B S*]: S_Y||alpha")
 
         return pack('qxq', S_Y, alpha)
 
@@ -485,11 +488,9 @@ def printOptions(isInitiator, port = None, uip = None, uport = None):
     print("[*]: Запуск легального клиента")
 
     if isInitiator:
-        print("[*]: Режим инициатора")
-        print("[*]:")
+        print("[*]: Режим инициатора\n")
     else:
-        print("[*]: Режим ожидания инициатора")
-        print("[*]:")
+        print("[*]: Режим ожидания инициатора\n")
         print("[*]: Параметры сети")
         print("[*]: \tport = {0:d}".format(port))
 
@@ -515,7 +516,7 @@ def printOptions(isInitiator, port = None, uip = None, uport = None):
 
 
 def main():
-    global settings
+    global settings, mitm
 
     optionParser = OptionParser()
     
@@ -567,7 +568,7 @@ def main():
 
         ip, port = (None, None)
 
-        if options.__dict__['mitm'] :
+        if options.__dict__['mitm']:
             ip = settings['umip']
             port = settings['umport']
         else:
@@ -584,11 +585,9 @@ def main():
         else:
             print("Ошибка [!]: Укажите корректные значения ip и port")
             return
-
-        print("[*]:")
-        print("[*]: Клиент готов")
-        print("[*]: Подключение...")
-        print("[*]:")    
+            
+        print("\n[*]: Клиент готов")
+        print("[*]: Подключение...\n")        
     elif options.__dict__['listen']:
         csm = ClientSettingsManager('lclient_settings.xml')
 
@@ -613,15 +612,14 @@ def main():
 
         factory = protocol.ServerFactory()
         factory.protocol = ClientListner
+        mitm = options.__dict__['mitm']
         try:
             reactor.listenTCP(port, factory)
         except:
             print("Ошибка [!]: Ошибка при инициализации порта")
-
-        print("[*]:")
-        print("[*]: Клиент готов")
-        print("[*]: Ожидание подключения...")
-        print("[*]:")
+        
+        print("\n[*]: Клиент готов")
+        print("[*]: Ожидание подключения...\n")
 
     reactor.run()
 

@@ -37,6 +37,14 @@
             "args": ["-o"]
         },
         {
+            "name": "mitm",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["-m"]
+        },        
+        {
             "name": "Python: Текущий файл",
             "type": "python",
             "request": "launch",

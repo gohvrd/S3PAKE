@@ -5,6 +5,7 @@ from optparse import OptionParser
 import re
 import xml.etree.ElementTree as xml
 from math import log
+from time import sleep
 
 settings = {
     'port':     None,
@@ -29,7 +30,7 @@ def G(values: tuple):
 
 
 def H(values: tuple):
-    return settings['g'] ** ((values[0] + values[1] * values[2]) % settings['q'])
+    return settings['g'] ** ((values[0] + values[1] + values[2]) % settings['q'])
 
 
 #Offline Dictionary attack
@@ -61,7 +62,7 @@ class OFFDA(protocol.Protocol):
         print("[*]: \tX = M^x = {0:d}".format(X))
         print("[*]: \tY = M^y * N^pw = {0:d}".format(Y))
 
-        print("[*I→S*]: A||X||B||Y")
+        print("[*I→S*]: A||X||I||Y")
 
         return pack('hxq', settings['aid'], X) + pack('hxq', settings['id'], Y)
 
@@ -87,7 +88,7 @@ class OFFDA(protocol.Protocol):
             print("\n----------------------------------------\n")
 
             print("[*]: Вычисляется K\' = {0:d}".format(cK))
-            print("[*]: Предполагаемое значение пароля пользователя (id = {0:d}): {1:d}".format(settings['aid'], pwA))
+            print("[*]: Предполагаемое значение пароля пользователя (id: {0:d}) = {1:d}".format(settings['aid'], pwA))
 
             if K == cK:
                 break
@@ -158,26 +159,26 @@ class UONDAlistener(protocol.Protocol):
         print("[*]: \tS_Y = {0:d}".format(random_S_Y))
         print("[*]: \talpha = {0:d}".format(random_alpha))
 
-        print("[*]: sending random S_Y||alpha to A (the correctness of the parameters is not important)")
+        print("[*A←I S*]: S_Y||alpha")
 
         return pack('qxq', random_S_Y, random_alpha), A, X
 
     def tryPassword(self, pw):
         print("\n----------------------------------------\n")
 
-        print("[*]: trying password pwA\' = ", pw)
+        print("[*]: Предполагаемое значение пароля пользователя (id: {0:d}) = {1:d}".format(self.initId, pw))
 
         g_power_g_x = int(self.initX / settings['M'] ** pw)
         self.g_x = int(log(g_power_g_x, settings['g']))
 
-        print("Attacker calculates [*]: g^x = ", self.g_x)
+        print("[*]: Вычисляется g^x = {0:d}".format(self.g_x))
 
         Y = (g_power_g_x ** self.y) * settings['N'] ** settings['pw']
-        print("Attacker calculates [*]: Y = ", Y, "\n")
+        print("[*]: Вычисляется Y = {0:d}".format(Y))
 
         message = pack('hxq', self.initId, self.initX) + pack('hxq', settings['id'], Y)
 
-        print("[*]: sending A||X||B||Y to S\n")
+        print("[*A I→S*]: A||X||I||Y")
 
         return message
 
@@ -197,7 +198,7 @@ class UONDAproxy(protocol.Protocol):
             self.write(message)
         else:
             print("\n----------------------------------------\n")
-            print("Attacker guessed password [$COMPLETE$] pwA = ", self.factory.server.pwGuess, "\n")
+            print("[$Выполнено$] Значение pw для пользователя (id: {0:d}) = {1:d}".format(self.factory.server.initId, self.factory.server.pwGuess))
             #g_pwA = 0 пока не понятно, зачем я это сделал
             reactor.stop()
 
@@ -206,27 +207,29 @@ class UONDAproxy(protocol.Protocol):
             self.transport.write(data)
 
     def passwordGuessResult(self, response):
-        print("[*]: receiving S_X||S_Y from S")
+        print("[*A I←S*]: S_X||S_Y")
 
         S_X, S_Y = unpack('qxq', response)
-        print("S parameters (received) [*]: S_X = ", S_X)
-        print("S parameters (received) [*]: S_Y = ", S_Y)
+        print("[*]: \tS_X = {0:d}".format(S_X))
+        print("[*]: \tS_Y = {0:d}".format(S_Y))
 
-        print("\n[*]: checking a guess")
+        print("[*]: Проверка предположения о значении пароля")
 
         g_power_xz = int(S_X / G((settings['id'], settings['sid'], settings['g'] ** (self.factory.server.g_x * self.factory.server.y))) ** settings['pw'])
-        print("Attacker calculates [*]: g^(xz) = ", g_power_xz)
+        print("[*]: Вычисляется g^(xz) = {0:d}".format(g_power_xz))
 
         g_power_xzy = int(S_Y / G((self.factory.server.initId, settings['sid'], settings['g'] ** self.factory.server.g_x)) ** self.factory.server.pwGuess)
-        print("Attacker calculates [*]: g^(x\'zy) = ", g_power_xzy, "\n")
+        print("[*]: Вычисляется g^(x\'zy) = {0:d}".format(g_power_xzy))
+
+        print("[*]: Сравнение вычисленных величин")
 
         if (g_power_xz ** self.factory.server.y == g_power_xzy):
             print("[*]: g^(xz) = g^(x\'zy)")
-            print("[*]: the guess is correct")
+            print("[*]: Предположение верно")
             return True
 
         print("[*]: g^(xz) != g^(x\'zy)")
-        print("[*]: the guess isn\'t correct")
+        print("[*]: Предположение не верно")
 
         return False
 
@@ -240,7 +243,7 @@ class MITMlistener(protocol.Protocol):
         self.g_power_xz = None
         self.SK1 = None
 
-        self.connected = False
+        self.clientConnected = False
         self.connectionToTS = None
         self.forWaitBuffer = ''
 
@@ -251,34 +254,34 @@ class MITMlistener(protocol.Protocol):
         reactor.connectTCP(settings['sip'], settings['sport'], MITMlproxyFactory)
 
     def dataReceived(self, data):
-        if not self.connected:            
+        if not self.clientConnected:            
             V = settings['g'] ** self.v * settings['N'] ** settings['pw']
-            print("MITM action [*SESSION-1*]: receiving A||X from A\n")
+            print("Сеанс №1 [*A→I(B) B I S*]: A||X\n")
             
-            print("MITM action [*SESSION-1*]: choosing randomg number v from Zp")
-            print("MITM paramteters [*SESSION-1*]: v = ", v)
-            print("MITM action [*SESSION-1*]: calculating V")
-            print("MITM paramteters [*SESSION-1*]: V = ", V)
+            print("Сеанс №1 [*]: Выбирается случайное v = {0:d} из Zp".format(self.v))
+            print("Сеанс №1 [*]: Вычисляется V = {0:d}\n".format(V))            
 
-            print("MITM action [*SESSION-1*]: sending A||X||C||V to S\n")
-
+            print("Сеанс №1 [*A I B I→S*]: A||X||I||V")
 
             if self.connectionToTS is not None:
                 self.connectionToTS.write(data + pack('hxq', settings['id'], V))
             else:
                 self.forWaitBuffer = data + pack('hxq', settings['id'], V)
 
-            self.connected = True
+            self.clientConnected = True
         else:
             beta = unpack('q', data)[0]
-            print("MITM status [*SESSION-1*]: Client A alpha check was successful.")
-            print("MITM status [*SESSION-1*]: Session key can be calculated.\n")
-            print("MITM action [*SESSION-1*]: receiving beta from A")
-            print("A paramteters (received) [*SESSION-1*]: beta = ", beta)
-            print("MITM action [*SESSION-1*]: independently calculate the beta\' and compare it with the beta")
+            print("Сеанс №1 [*]: Значение alpha прошло проверку у клиента A")            
+            print("\nСеанс №1 [*A→I(B) B I S*]: beta\n")
+            print("Сеанс №1 [*]: beta = {0:d}".format(beta))
+            print("Сеанс №1 [*]: Вычисление beta\' и сравнение его с beta")
 
-            if beta == int(G((settings['bid'], settings['aid'], self.g_power_xz ** self.v))):
-                print("MITM action [*SESSION-1*]: beta\' = beta\n")
+            test_beta = int(G((settings['bid'], settings['aid'], self.g_power_xz ** self.v)))
+
+            print("Сеанс №1 [*]: beta\' = {0:d}".format(test_beta))
+
+            if beta == test_beta:
+                print("Сеанс №1 [*]: beta\' = beta\n")
                 self.SK1 = H((settings['aid'], settings['bid'], self.g_power_xz ** self.v))
 
                 MITMinitiatorFactory = protocol.ClientFactory()
@@ -287,8 +290,8 @@ class MITMlistener(protocol.Protocol):
 
                 reactor.connectTCP(settings['bip'], settings['bport'], MITMinitiatorFactory)
             else:
-               print("MITM action [*SESSION-1*]: beta\' != beta")
-               print("MITM Error [!SESSION-1!]: Wrong beta.\n")
+               print("Сеанс №1 [*]: beta\' != beta")
+               print("Сеанс №1 Ошибка [!]: Полученное значение не верно")
 
     def write(self, data):
         self.transport.write(data)
@@ -304,16 +307,16 @@ class MITMlproxy(protocol.Protocol):
 
     def dataReceived(self, data):
         S_X, S_V = unpack('qxq', data)
-        print("MITM action [*SESSION-1*]: receiving S_X||S_V from S")
+        print("Сеанс №1 [*A I B I←S*]: S_X||S_V\n")
 
-        print("S paramteters (received) [*SESSION-1*]: S_X = ", S_X)
-        print("S paramteters (received) [*SESSION-1*]: S_V = ", S_V, "\n")
+        print("Сеанс №1 [*]: \tS_X = {0:d}".format(S_X))
+        print("Сеанс №1 [*]: \tS_V = {0:d}".format(S_V))
         self.factory.main.g_power_xz = int(S_X / G((settings['id'], settings['sid'], settings['g'] ** self.factory.main.v)) ** settings['pw'])
-        print("MITM calculates [*SESSION-1*]: g^(xz) = ", self.factory.main.g_power_xz)
+        print("Сеанс №1 [*]: Вычисляется g^(xz) = {0:d}".format(self.factory.main.g_power_xz))
         alpha = int(G((settings['aid'], settings['bid'], self.factory.main.g_power_xz ** self.factory.main.v)))
-        print("MITM calculates [*SESSION-1*]: alpha = ", alpha)
+        print("Сеанс №1 [*]: Вычисляется alpha = {0:d}".format(alpha))
 
-        print("MITM action [*SESSION-1*]: sending S_V||alpha to A\n")
+        print("\nСеанс №1 [*A←I(B) B I S*]: S_V||alpha\n")
      
         self.factory.main.write(pack('qxq', S_V, alpha))
 
@@ -328,46 +331,47 @@ class MITMinitiator(protocol.Protocol):
 
     def connectionMade(self):
         W = settings['g'] ** self.w * settings['M'] ** settings['pw']
-        print("MITM action [*SESSION-2*]: choosing random number w from Zp")
-        print("MITM paramteters [*SESSION-2*]: w = ", self.w)
-        print("MITM paramteters [*SESSION-2*]: W = ", W)
-        print("MITM action [*SESSION-2*]: calculating W")
+        print("Сеанс №2 [*]: Выбирается случайное w = {0:d} из Zp".format(self.w))
+        print("Сеанс №2 [*]: Вычисляется W = {0:d}\n".format(W))
 
-        print("MITM action [*SESSION-2*]: sending A||W to B\n")
+        print("Сеанс №2 [*A I(A)→B I S*]: A||W")
 
         self.write(pack('hxq', settings['aid'], W))
 
     def dataReceived(self, data):
-        #C (client) <== B --- C (server) --- S      
         S_W, alpha = unpack('qxq', data)
-        print("MITM action [*SESSION-2*]: receiving S_W||alpha from B")
-        print("S paramteters (received) [*SESSION-2*]: S_W = ", S_W)
-        print("B paramteters (received) [*SESSION-2*]: alpha = ", alpha, "\n")
+        print("Сеанс №2 [*A I(A)←B I S*]: S_W||alpha\n")
+        print("Сеанс №2 [*]: \tS_W = {0:d}".format(S_W))
+        print("Сеанс №2 [*]: \talpha = {0:d}".format(alpha))
 
         g_power_yz = int(S_W / (G((settings['id'], settings['sid'], settings['g'] ** self.w)) ** settings['pw']))
-        print("MITM calculates [*SESSION-2*]: g^(yz) = ", g_power_yz)
+        print("Сеанс №2 [*]: Вычисляется g^(yz) = {0:d}".format(g_power_yz))
 
         test_alpha = int(G((settings['aid'], settings['bid'], g_power_yz ** self.w)))
 
+        print("Сеанс №2 [*]: Проверяется полученное значение alpha")
+        print("Сеанс №2 [*]: Вычисляется alpha\' = {0:d}".format(test_alpha))
+
         if alpha == test_alpha:
-            print("MITM action [*SESSION-2*]: alpha\' = alpha")
-            print("MITM status [*SESSION-2*]: MITM alpha check was successful.")
-            print("MITM status [*SESSION-2*]: Session key can be calculated.\n")
+            print("Сеанс №2 [*]: alpha\' = alpha")            
+            print("Сеанс №2 [*]: Полученное значение верно")
 
             SK2 = H((settings['aid'], settings['bid'], g_power_yz ** self.w))
 
             beta = int(G((settings['bid'], settings['aid'], g_power_yz ** self.w)))
-            print("MITM calculates [*SESSION-2*]: beta = ", beta)
-            print("MITM action [*SESSION-2*]: sending beta to B\n")
+            print("Сеанс №2 [*]: Вычисляется beta = {0:d}".format(beta))
+            print("\nСеанс №2 [*A I(A)→B I S*]: beta\n")
 
             self.write(pack('q', beta))
-            self.transport.loseConnection()
 
-            print("MITM status [*]: Attack completed successfully.")
-            print("MITM results [*A <--> MITM*]: SK = ", self.factory.main.SK1)
-            print("MITM results [*MITM <--> B*]: SK = ", SK2)
+            print("[*]: Атака завершена успешно")
+            print("[*]: Получены все сеансовые ключи")
+            print("[*A <--> I(B)*]: SK = ", self.factory.main.SK1)
+            print("[*I(A) <--> B*]: SK = ", SK2)
         else:
-            print("MITM action [*SESSION-2*]: alpha\' != alpha")
+            print("Сеанс №2 [*]: alpha\' != alpha")
+            print("Сеанс №2 [*]: Полученное значение не верно")
+            print("Сеанс №2 [*]: Завершение сеанса")
 
     def write(self, data):
         self.transport.write(data)
@@ -392,12 +396,14 @@ class MITMserver(protocol.Protocol):
         else:
             self.forWaitBuffer = pack('hxqhxq', settings['id'], W, B, Y)
 
-        print("MITM status [*SESSION-2*]: Change message from A||W||B||Y to C||W||B||Y and send to TS.\n")
+        print("Сеанс №2 [*A I B→I(S) S*]: A||W||B||Y")
+        print("\nСеанс №2 [*]: Заменяем сообщение A||W||B||Y на I||W||B||Y\n")
+        print("Сеанс №2 [*A I B I(B)→S*]: I||W||B||Y")
 
     def write(self, data):
+        print("Сеанс №2 [*A I B I(B)←S*]: W\'||Y\'")
         self.transport.write(data)
-
-        print("MITM status [*SESSION-2*]: Proxy TS answer W\'||Y\' to B.\n")
+        print("Сеанс №2 [*A I B←I(S) S*]: W\'||Y\'")
 
 
 class MITMsproxy(protocol.Protocol):
@@ -665,6 +671,38 @@ class ClientSettingsManager():
         return settings
 
 
+def printOptions(mitm=False, offda=False, uonda=False):
+    print("[*]: Параметры клиента (секретные)")
+    print("[*]: \tpw = {0:d}".format(settings['pw']))
+    print("[*]: Параметры клиента (публичные)")
+    print("[*]: \tid = {0:d}".format(settings['id']))
+    print("[*]: \tq = {0:d}".format(settings['q']))
+    print("[*]: \tg = {0:d}".format(settings['g']))
+    print("[*]: \tM = {0:d}".format(settings['M']))
+    print("[*]: \tN = {0:d}".format(settings['N']))
+    print("[*]: Параметры сервера")
+    print("[*]: \tid = {0:d}".format(settings['sid']))
+    print("[*]: \tip = {0:s}".format(settings['sip']))
+    print("[*]: \tport = {0:d}".format(settings['sport']))
+
+    if mitm:
+        print("[*]: Параметры клиента A")
+        print("[*]: \tid = {0:d}".format(settings['aid']))
+        print("[*]: Параметры клиента B")
+        print("[*]: \tid = {0:d}".format(settings['bid']))
+        print("[*]: \tip = {0:s}".format(settings['bip']))
+        print("[*]: \tport = {0:d}".format(settings['bport']))
+        print("[*]: Параметры сети")
+        print("[*]: \tport = {0:d}".format(settings['port']))
+        print("[*]: \textport = {0:d}".format(settings['extport']))   
+    elif offda:
+        print("[*]: Параметры атакуемого клиента")
+        print("[*]: \tid = {0:d}".format(settings['aid']))
+    elif uonda:        
+        print("[*]: Параметры сети")
+        print("[*]: \tport = {0:d}".format(settings['port']))
+
+
 def main():
     optionParser = OptionParser()
 
@@ -705,6 +743,9 @@ def main():
 
     if options.__dict__['mitm']:
         print("[*]: Демонстрация атаки MITM")
+
+        printOptions(mitm=True)
+
         serverFactory = protocol.ServerFactory()
         serverFactory.protocol = MITMserver
 
@@ -719,8 +760,14 @@ def main():
             reactor.listenTCP(settings['extport'], serverFactory)
         except:
             print("Ошибка [!]: Ошибка при инициализации порта {0:d}".format(settings['extport']))
+
+        print("[*]: Инициализация завершена успешно\n")
+        print("[*]: Ожидание подключений...\n")
     elif options.__dict__['offlineDict']:
         print("[*]: Демонстрация атаки Offline Dictionary Attack")
+
+        printOptions(offda=True)
+
         initiatorFactory = protocol.ClientFactory()
         initiatorFactory.protocol = OFFDA
 
@@ -728,8 +775,14 @@ def main():
             reactor.connectTCP(settings['sip'], settings['sport'], initiatorFactory)
         except:
             print("Ошибка [!]: Ошибка при подключении по адресу {0:s}:{1:d}".format(settings['sip'], settings['sport']))
+
+        print("[*]: Инициализация завершена успешно\n")
+        print("[*]: Подключение...\n")
     elif options.__dict__['undetectableOnlineDict']:
         print("[*]: Демонстрация атаки Undetectable Online Dictionary Attack")
+
+        printOptions(uonda=True)
+
         listnerFactory = protocol.ServerFactory()
         listnerFactory.protocol = UONDAlistener
 
@@ -738,7 +791,9 @@ def main():
         except:
             print("Ошибка [!]: Ошибка при инициализации порта {0:d}".format(settings['port']))
 
-    print("[*]: Инициализация завершена успешно\n")
+        print("[*]: Инициализация завершена успешно\n")
+        print("[*]: Ожидание подключения...\n")
+    
     reactor.run()
 
 
