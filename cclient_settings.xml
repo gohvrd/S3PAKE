@@ -1,7 +1,6 @@
-<?xml version='1.0' encoding='us-ascii'?>
 <settings>
     <network>
-        <port></port>
+        <port />
     </network>
     <private>
         <pw>2</pw>
@@ -11,15 +10,15 @@
         <q>4</q>
         <g>2</g>
         <M>2</M>
-        <N></N>
+        <N />
     </public>
     <server>
         <sid>333</sid>
-        <sip></sip>
-        <sport></sport>
+        <sip />
+        <sport />
     </server>
     <user>
         <uid>222</uid>
     </user>
-    <mitm><umip /><umport /><smip /><smport /></mitm>
+    <mitm><umip>127.0.0.1</umip><umport>5678</umport><smip>127.0.0.1</smip><smport>6789</smport></mitm>
 </settings>

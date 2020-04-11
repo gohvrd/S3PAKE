@@ -142,29 +142,30 @@ class UONDAlistener(protocol.Protocol):
         self.transport.write(data)
 
     def receiveConnectRequest(self, message):
-        print("Attacker action [*]: choosing random y from Zp")
-        print("Attacker parameters [*]: y = ", self.y)
-
-        print("\nAttacker action [*]: receiving A||X from A")
+        print("[*A→I S*]: A||X")
 
         A, X = unpack('hxq', message)
 
-        print("A parameters [*]: A = ", A)
-        print("A parameters [*]: X = ", X, "\n")
+        print("[*]: \tA = {0:d}".format(A))
+        print("[*]: \tX = {0:d}".format(X))
+
+        print("[*]: Выбирается случайное y = {0:d} из Zp".format(self.y))       
 
         random_S_Y = randint(1, 100000)
         random_alpha = randint(1, 100000)
-        print("Attacker parameters [*]: random S_Y = ", random_S_Y)
-        print("Attacker parameters [*]: random alpha = ", random_alpha, "\n")
 
-        print("Attacker action [*]: sending random S_Y||alpha to A (the correctness of the parameters is not important)")
+        print("[*]: Сразу инициатору отправляется завершающее сообщение со случайными параметрами")
+        print("[*]: \tS_Y = {0:d}".format(random_S_Y))
+        print("[*]: \talpha = {0:d}".format(random_alpha))
+
+        print("[*]: sending random S_Y||alpha to A (the correctness of the parameters is not important)")
 
         return pack('qxq', random_S_Y, random_alpha), A, X
 
     def tryPassword(self, pw):
         print("\n----------------------------------------\n")
 
-        print("Attacker action [*]: trying password pwA\' = ", pw)
+        print("[*]: trying password pwA\' = ", pw)
 
         g_power_g_x = int(self.initX / settings['M'] ** pw)
         self.g_x = int(log(g_power_g_x, settings['g']))
@@ -176,7 +177,7 @@ class UONDAlistener(protocol.Protocol):
 
         message = pack('hxq', self.initId, self.initX) + pack('hxq', settings['id'], Y)
 
-        print("Attacker action [*]: sending A||X||B||Y to S\n")
+        print("[*]: sending A||X||B||Y to S\n")
 
         return message
 
@@ -205,13 +206,13 @@ class UONDAproxy(protocol.Protocol):
             self.transport.write(data)
 
     def passwordGuessResult(self, response):
-        print("Attacker action [*]: receiving S_X||S_Y from S")
+        print("[*]: receiving S_X||S_Y from S")
 
         S_X, S_Y = unpack('qxq', response)
         print("S parameters (received) [*]: S_X = ", S_X)
         print("S parameters (received) [*]: S_Y = ", S_Y)
 
-        print("\nAttacker action [*]: checking a guess")
+        print("\n[*]: checking a guess")
 
         g_power_xz = int(S_X / G((settings['id'], settings['sid'], settings['g'] ** (self.factory.server.g_x * self.factory.server.y))) ** settings['pw'])
         print("Attacker calculates [*]: g^(xz) = ", g_power_xz)
@@ -220,12 +221,12 @@ class UONDAproxy(protocol.Protocol):
         print("Attacker calculates [*]: g^(x\'zy) = ", g_power_xzy, "\n")
 
         if (g_power_xz ** self.factory.server.y == g_power_xzy):
-            print("Attacker action [*]: g^(xz) = g^(x\'zy)")
-            print("Attacker action [*]: the guess is correct")
+            print("[*]: g^(xz) = g^(x\'zy)")
+            print("[*]: the guess is correct")
             return True
 
-        print("Attacker action [*]: g^(xz) != g^(x\'zy)")
-        print("Attacker action [*]: the guess isn\'t correct")
+        print("[*]: g^(xz) != g^(x\'zy)")
+        print("[*]: the guess isn\'t correct")
 
         return False
 

@@ -541,9 +541,7 @@ def main():
     optionParser.add_option('--smip', action='store')   
     optionParser.add_option('--smport', action='store')   
 
-    (options, arguments) = optionParser.parse_args()
-
-      
+    (options, arguments) = optionParser.parse_args()      
         
     if options.__dict__['connect'] is not None:        
         if options.__dict__['listen']:
