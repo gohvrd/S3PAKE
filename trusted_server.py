@@ -364,18 +364,18 @@ def dbOptions(new: str, dele: str, upd: str):
 def main():
     global settings
 
-    optionParser = optparse.OptionParser()
+    optionParser = optparse.OptionParser(description='Реализация доверенного сервера, работающего по протоколу S-3PAKE')
     
-    optionParser.add_option('-i', '--id', action='store')
-    optionParser.add_option('-p', '--port', action='store')
-    optionParser.add_option('-q', '--q', action='store')
-    optionParser.add_option('-g', '--g', action='store')
-    optionParser.add_option('-M', '--M', action='store')
-    optionParser.add_option('-N', '--N', action='store')
+    optionParser.add_option('-i', '--id', action='store', help='Установка числового значения идентификатора доверенного сервера')
+    optionParser.add_option('-p', '--port', action='store', help='Установка значения порта доверенного сервера, на котором ожидается подключение клиентов')
+    optionParser.add_option('-q', '--q', action='store', help='Установка значения порядка группы')
+    optionParser.add_option('-g', '--g', action='store', help='Установка значения порождающего элемента группы')
+    optionParser.add_option('-M', '--M', action='store', help='Установка затемняющего значения M')
+    optionParser.add_option('-N', '--N', action='store', help='Установка затемняющего значения N')
 
-    optionParser.add_option('-n', '--new', action='store')
-    optionParser.add_option('-d', '--del', action='store')
-    optionParser.add_option('-u', '--upd', action='store')
+    optionParser.add_option('-n', '--new', action='store', help='Добавление нового пользователя в базу')
+    optionParser.add_option('-d', '--del', action='store', help='Удаление пользователя из базы')
+    optionParser.add_option('-u', '--upd', action='store', help='Изменение пароля пользователя')
 
     (options, arguments) = optionParser.parse_args()
 

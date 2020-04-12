@@ -518,29 +518,29 @@ def printOptions(isInitiator, port = None, uip = None, uport = None):
 def main():
     global settings, mitm
 
-    optionParser = OptionParser()
+    optionParser = OptionParser(description='Клиент легального пользователя, работающий по протоколу S-3PAKE')
     
-    optionParser.add_option('-p', '--port', action='store')
-    optionParser.add_option('-d', '--id', action='store')
-    optionParser.add_option('-w', '--pw', action='store')
-    optionParser.add_option('-q', '--q', action='store')
-    optionParser.add_option('-g', '--g', action='store')
-    optionParser.add_option('-M', '--M', action='store')
-    optionParser.add_option('-N', '--N', action='store')
-    optionParser.add_option('-S', '--sid', action='store')
-    optionParser.add_option('-i', '--sip', action='store')
-    optionParser.add_option('-s', '--sport', action='store')
-    optionParser.add_option('-u', '--uid', action='store')
+    optionParser.add_option('-p', '--port', action='store', help='Установка порта, на котором клиент будет ожидать подключения')
+    optionParser.add_option('-d', '--id', action='store', help='Установка числового идентификатора клиента')
+    optionParser.add_option('-w', '--pw', action='store', help='Установка секретного пароля клиента')
+    optionParser.add_option('-q', '--q', action='store', help='Установка значения порядка группы')
+    optionParser.add_option('-g', '--g', action='store', help='Установка порождающего элемента группы')
+    optionParser.add_option('-M', '--M', action='store', help='Установка затемняющего значения M')
+    optionParser.add_option('-N', '--N', action='store', help='Установка затемняющего значения N')
+    optionParser.add_option('-S', '--sid', action='store', help='Установка числового идентификатора доверенного сервера')
+    optionParser.add_option('-i', '--sip', action='store', help='Установка ip-адреса доверенного сервера')
+    optionParser.add_option('-s', '--sport', action='store', help='Установка порта доверенного сервера')
+    optionParser.add_option('-u', '--uid', action='store', help='Установка числового идентификатора клиента, с которым устанавливается соединение')
 
-    optionParser.add_option('-c', '--connect', action='store')
-    optionParser.add_option('-l', '--listen', action='store_true')
+    optionParser.add_option('-c', '--connect', action='store', help='Выбор режима инициатора')
+    optionParser.add_option('-l', '--listen', action='store_true', help='Выбор режима ожидания подключения инициатора')
 
-    optionParser.add_option('-m', '--mitm', action='store_true')
+    optionParser.add_option('-m', '--mitm', action='store_true', help='Включение опции, позволяющей провести MITM атаку')
 
-    optionParser.add_option('--umip', action='store')   
-    optionParser.add_option('--umport', action='store')   
-    optionParser.add_option('--smip', action='store')   
-    optionParser.add_option('--smport', action='store')   
+    optionParser.add_option('--umip', action='store', help='Установка ip-адреса атакующего, выдающего себя за другого клиента')   
+    optionParser.add_option('--umport', action='store', help='Установка порта атакующего, выдающего себя за другого клиента')   
+    optionParser.add_option('--smip', action='store', help='Установка ip-адреса атакующего, выдающего себя за доверенный сервер')   
+    optionParser.add_option('--smport', action='store', help='Установка порта атакующего, выдающего себя за доверенный сервер')   
 
     (options, arguments) = optionParser.parse_args()      
         
