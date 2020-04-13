@@ -32,6 +32,7 @@ class TrustedServer(protocol.Protocol):
         global sessionNum
 
         sessionNum = self.sessionNum + 1
+		self.sessionNum += 1
 
     def dataReceived(self, data):
         print("[*]: Сеанс №{0:d}".format(self.sessionNum))

@@ -105,7 +105,7 @@ class OFFDA(protocol.Protocol):
 class UONDAlistener(protocol.Protocol):
     def __init__(self):
         seed()
-        self.y = randint(1, settings['q'] - 1)
+        self.y = randint(1, settings['q'] - 1)        
         self.pwGuess = 0
         self.g_x = None
         self.initId = None
@@ -239,7 +239,7 @@ class UONDAproxy(protocol.Protocol):
 class MITMlistener(protocol.Protocol):
     def __init__(self):
         seed()
-        self.v = randint(1, settings['q'] - 1)
+        self.v = randint(1, settings['q'] - 1)        
         self.g_power_xz = None
         self.SK1 = None
 
