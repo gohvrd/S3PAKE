@@ -105,7 +105,8 @@ class OFFDA(protocol.Protocol):
 class UONDAlistener(protocol.Protocol):
     def __init__(self):
         seed()
-        self.y = randint(1, settings['q'] - 1)        
+        #self.y = randint(1, settings['q'] - 1)   
+        self.y = 2     
         self.pwGuess = 0
         self.g_x = None
         self.initId = None
@@ -143,7 +144,7 @@ class UONDAlistener(protocol.Protocol):
         self.transport.write(data)
 
     def receiveConnectRequest(self, message):
-        print("[*A→I S*]: A||X")
+        print("[*A→I S*]: A||X\n")
 
         A, X = unpack('hxq', message)
 
@@ -159,7 +160,7 @@ class UONDAlistener(protocol.Protocol):
         print("[*]: \tS_Y = {0:d}".format(random_S_Y))
         print("[*]: \talpha = {0:d}".format(random_alpha))
 
-        print("[*A←I S*]: S_Y||alpha")
+        print("\n[*A←I S*]: S_Y||alpha")
 
         return pack('qxq', random_S_Y, random_alpha), A, X
 
@@ -178,7 +179,7 @@ class UONDAlistener(protocol.Protocol):
 
         message = pack('hxq', self.initId, self.initX) + pack('hxq', settings['id'], Y)
 
-        print("[*A I→S*]: A||X||I||Y")
+        print("\n[*A I→S*]: A||X||I||Y")
 
         return message
 
@@ -199,7 +200,7 @@ class UONDAproxy(protocol.Protocol):
         else:
             print("\n----------------------------------------\n")
             print("[$Выполнено$] Значение pw для пользователя (id: {0:d}) = {1:d}".format(self.factory.server.initId, self.factory.server.pwGuess))
-            #g_pwA = 0 пока не понятно, зачем я это сделал
+            
             reactor.stop()
 
     def write(self, data):
@@ -207,7 +208,7 @@ class UONDAproxy(protocol.Protocol):
             self.transport.write(data)
 
     def passwordGuessResult(self, response):
-        print("[*A I←S*]: S_X||S_Y")
+        print("[*A I←S*]: S_X||S_Y\n")
 
         S_X, S_Y = unpack('qxq', response)
         print("[*]: \tS_X = {0:d}".format(S_X))
@@ -218,17 +219,21 @@ class UONDAproxy(protocol.Protocol):
         g_power_xz = int(S_X / G((settings['id'], settings['sid'], settings['g'] ** (self.factory.server.g_x * self.factory.server.y))) ** settings['pw'])
         print("[*]: Вычисляется g^(xz) = {0:d}".format(g_power_xz))
 
+        g_power_xz_power_y = g_power_xz ** self.factory.server.y
+
+        print("[*]: Вычисляется (g^(xz))^y = {0:d}".format(g_power_xz_power_y))
+
         g_power_xzy = int(S_Y / G((self.factory.server.initId, settings['sid'], settings['g'] ** self.factory.server.g_x)) ** self.factory.server.pwGuess)
         print("[*]: Вычисляется g^(x\'zy) = {0:d}".format(g_power_xzy))
 
         print("[*]: Сравнение вычисленных величин")
 
         if (g_power_xz ** self.factory.server.y == g_power_xzy):
-            print("[*]: g^(xz) = g^(x\'zy)")
+            print("[*]: (g^(xz))^y = g^(x\'zy)")
             print("[*]: Предположение верно")
             return True
 
-        print("[*]: g^(xz) != g^(x\'zy)")
+        print("[*]: (g^(xz))^y != g^(x\'zy)")
         print("[*]: Предположение не верно")
 
         return False

@@ -32,13 +32,14 @@ class TrustedServer(protocol.Protocol):
         global sessionNum
 
         sessionNum = self.sessionNum + 1
-		self.sessionNum += 1
+        self.sessionNum += 1
 
     def dataReceived(self, data):
         print("[*]: Сеанс №{0:d}".format(self.sessionNum))
 
         seed()
-        z = randint(1, self.settings['q'] - 1)
+        #z = randint(1, self.settings['q'] - 1)
+        z = 2
         A, X, B, Y = unpack('hxqhxq', data)
 
         print("[*A B→S*]: A||X||B||Y от пользователя с id = {0:d}".format(B))
