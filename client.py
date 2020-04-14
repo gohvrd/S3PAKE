@@ -112,7 +112,7 @@ class ClientInitiatorFactory(protocol.ClientFactory):
         reactor.stop()
 
 
-class ClientListner(protocol.Protocol):
+class ClientListener(protocol.Protocol):
     def __init__(self):
         global settings, mitm
 
@@ -611,7 +611,7 @@ def main():
         printOptions(isInitiator=False, port=port)
 
         factory = protocol.ServerFactory()
-        factory.protocol = ClientListner
+        factory.protocol = ClientListener
         mitm = options.__dict__['mitm']
         try:
             reactor.listenTCP(port, factory)
