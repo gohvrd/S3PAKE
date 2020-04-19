@@ -64,9 +64,6 @@ class ClientInitiator(protocol.Protocol):
             print("Ошибка [!]: Получено неверное значение alpha.")
             self.transport.loseConnection()
 
-    def connectionLost(self, reason):
-        pass
-
     def connectionInitializationMessage(self):
         seed()
         self.x = randint(1, self.settings['q'] - 1)
