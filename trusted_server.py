@@ -38,8 +38,8 @@ class TrustedServer(protocol.Protocol):
         print("[*]: Сеанс №{0:d}".format(self.sessionNum))
 
         seed()
-        #z = randint(1, self.settings['q'] - 1)
-        z = 2
+        z = randint(1, self.settings['q'] - 1)
+                
         A, X, B, Y = unpack('hxqhxq', data)
 
         print("[*A B→S*]: A||X||B||Y от пользователя с id = {0:d}".format(B))
